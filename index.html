@@ -4,7 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>ToDo App</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/tasks.css">
+    <link rel="stylesheet" href="css/history.css">
 </head>
 <body>
     <main class="app">
@@ -70,6 +72,12 @@
         </li>
     </template>
 
-    <script src="app.js" defer></script>
+    <!-- 読み込み順に依存関係があるため、この順番を変えないこと -->
+    <script src="js/utils.js" defer></script>
+    <script src="js/state.js" defer></script>
+    <script src="js/storage.js" defer></script>
+    <script src="js/tasks.js" defer></script>
+    <script src="js/history.js" defer></script>
+    <script src="js/main.js" defer></script>
 </body>
 </html>
