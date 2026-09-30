@@ -7,6 +7,10 @@
 ```
 ToDo/
 ├── index.html        画面の HTML（CSS / JS の読み込み）
+├── CLAUDE.md         Claude に作業してもらうときのルール
+├── tools/
+│   └── check.sh      基本チェック（bash tools/check.sh）
+├── .github/          自動チェックとプルリクエストのひな形
 ├── css/
 │   ├── base.css      色変数・背景・全体レイアウト・共通クラス
 │   ├── tasks.css     入力フォーム・フィルター・タスクリスト・集計

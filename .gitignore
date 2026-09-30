@@ -1,0 +1,12 @@
+# OS が作るファイル
+.DS_Store
+Thumbs.db
+
+# エディタ
+.vscode/
+.idea/
+*.swp
+
+# 作業中に入り込みやすいもの
+node_modules/
+*.log
