@@ -8,6 +8,7 @@
 ToDo/
 ├── index.html        画面の HTML（CSS / JS の読み込み）
 ├── CLAUDE.md         Claude に作業してもらうときのルール
+├── STATUS.md         今の作業状況（ブランチ・次にやること）
 ├── tools/
 │   └── check.sh      基本チェック（bash tools/check.sh）
 ├── .github/          自動チェックとプルリクエストのひな形
