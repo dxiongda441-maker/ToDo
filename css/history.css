@@ -187,6 +187,7 @@ body.dark .history-item {
 .history-item-title {
     font-weight: 600;
     margin: 0;
+    word-break: break-word;
 }
 
 .history-meta {
