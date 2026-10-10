@@ -126,3 +126,4 @@ CPU 同士の対局（先後を交互に）では、すこし手ごわい が �
 | `utsuroi.record.v1` | CPU との戦績（駒落ちの対局は記録しない） |
 | `utsuroi.seenRules.v1` | 最初のルール説明を表示したかどうか |
 | `utsuroi.puzzles.v1` | 解いた詰め問題 |
+| `utsuroi.sound.v1` | 効果音のオン・オフ（初期設定はオフ） |

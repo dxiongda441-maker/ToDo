@@ -555,8 +555,58 @@
         }
     }
 
+    // ---------- 効果音（Web Audio で合成。初期設定は消音） ----------
+    const SOUND_KEY = "utsuroi.sound.v1";
+    let soundOn = load(SOUND_KEY, false) === true;
+    let audio = null;
+
+    function tone(frequency, start, duration, volume, type) {
+        const oscillator = audio.createOscillator();
+        const gain = audio.createGain();
+        oscillator.type = type || "sine";
+        oscillator.frequency.setValueAtTime(frequency, audio.currentTime + start);
+        gain.gain.setValueAtTime(0.0001, audio.currentTime + start);
+        gain.gain.exponentialRampToValueAtTime(volume, audio.currentTime + start + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + start + duration);
+        oscillator.connect(gain).connect(audio.destination);
+        oscillator.start(audio.currentTime + start);
+        oscillator.stop(audio.currentTime + start + duration + 0.02);
+    }
+
+    // kind: "move"（駒を置く）/ "capture"（駒を取る）/ "win" / "lose"
+    function playSound(kind) {
+        if (!soundOn) {
+            return;
+        }
+        try {
+            if (!audio) {
+                const Context = window.AudioContext || window.webkitAudioContext;
+                if (!Context) {
+                    return;
+                }
+                audio = new Context();
+            }
+            if (audio.state === "suspended") {
+                audio.resume();
+            }
+            if (kind === "move") {
+                tone(660, 0, 0.09, 0.18, "triangle");
+            } else if (kind === "capture") {
+                tone(220, 0, 0.16, 0.3, "triangle");
+                tone(330, 0.04, 0.12, 0.15, "sine");
+            } else if (kind === "win") {
+                [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.11, 0.35, 0.2, "sine"));
+            } else if (kind === "lose") {
+                [392, 330, 262].forEach((f, i) => tone(f, i * 0.16, 0.4, 0.16, "sine"));
+            }
+        } catch (_error) {
+            // 音が出せない環境でも遊べる
+        }
+    }
+
     function playMove(move) {
         const next = E.applyMove(current(), move);
+        playSound(next.lastMove.captured !== 0 ? "capture" : "move");
         game.history.push(next);
         game.moves.push([move.from, move.to]);
         clearSelection();
@@ -802,6 +852,8 @@ self.onmessage = event => {
     }
 
     function showResult(emoji, title, text, buttons) {
+        // 🍵＝負け・残念、🤝＝引き分け、それ以外＝勝ち・正解
+        playSound(emoji === "🍵" ? "lose" : emoji === "🤝" ? "move" : "win");
         $("#result-emoji").textContent = emoji;
         $("#result-title").textContent = title;
         $("#result-text").textContent = text;
@@ -1783,6 +1835,13 @@ self.onmessage = event => {
             render();
         });
         dangerToggle.addEventListener("change", render);
+        const soundToggle = $("#sound-toggle");
+        soundToggle.checked = soundOn;
+        soundToggle.addEventListener("change", () => {
+            soundOn = soundToggle.checked;
+            save(SOUND_KEY, soundOn);
+            playSound("move");
+        });
         copyCodeButton.addEventListener("click", async () => {
             const code = E.seedToCode(current().seed);
             try {
