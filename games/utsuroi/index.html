@@ -16,6 +16,7 @@
             </div>
             <nav class="masthead-links">
                 <button type="button" class="link-button" data-open="rules-dialog">ルール</button>
+                <button type="button" class="link-button" data-open="puzzle-dialog">詰め問題</button>
                 <button type="button" class="link-button" data-open="setup-dialog">新しい対局</button>
             </nav>
         </header>
@@ -35,6 +36,16 @@
             </section>
 
             <aside class="side" aria-label="対局の情報と操作">
+                <section class="card puzzle-card" id="puzzle-card" hidden>
+                    <h2 id="puzzle-title"></h2>
+                    <p id="puzzle-text"></p>
+                    <div class="actions">
+                        <button type="button" id="puzzle-retry" class="action">やり直す</button>
+                        <button type="button" id="puzzle-next" class="action">次の問題</button>
+                        <button type="button" id="puzzle-exit" class="action">対局に戻る</button>
+                    </div>
+                </section>
+
                 <section class="card">
                     <div class="turn-row">
                         <span id="turn-badge" class="turn-badge"></span>
@@ -64,7 +75,7 @@
                     <ol class="legend" id="legend"></ol>
                 </section>
 
-                <section class="card">
+                <section class="card" id="code-card">
                     <h2>盤面コード</h2>
                     <p class="code-row">
                         <code id="board-code" class="board-code"></code>
@@ -157,12 +168,21 @@
             <p id="result-emoji" class="result-emoji" aria-hidden="true"></p>
             <h2 id="result-title"></h2>
             <p id="result-text"></p>
-            <div class="dialog-actions">
-                <button type="submit" class="secondary" value="review">盤面を見る</button>
-                <button type="submit" class="secondary" value="same">同じ盤でもう一度</button>
-                <button type="submit" class="primary" value="new">新しい盤で</button>
-            </div>
+            <div class="dialog-actions" id="result-actions"></div>
         </form>
+    </dialog>
+
+    <!-- 詰め問題の一覧 -->
+    <dialog id="puzzle-dialog" class="dialog dialog--wide">
+        <div class="dialog-body">
+            <h2 tabindex="-1" autofocus>詰め問題</h2>
+            <p class="muted">決められた手数以内に勝つ問題です（相手の王を取る・玉座に着く）。相手は CPU が最善の受けをします。勝ちにつながる最初の一手は、どの問題も 1 つだけです。</p>
+            <div id="puzzle-list" class="puzzle-list"></div>
+            <p id="puzzle-progress" class="muted small"></p>
+            <div class="dialog-actions">
+                <button type="button" class="secondary" data-close>閉じる</button>
+            </div>
+        </div>
     </dialog>
 
     <!-- ルール -->
@@ -206,8 +226,9 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
-    <!-- 読み込み順：engine（ルールと CPU）→ ui（画面） -->
+    <!-- 読み込み順：engine（ルールと CPU）→ puzzles（詰め問題のデータ）→ ui（画面） -->
     <script src="engine.js" defer></script>
+    <script src="puzzles.js" defer></script>
     <script src="ui.js" defer></script>
 </body>
 </html>

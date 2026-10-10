@@ -330,6 +330,54 @@ test("CPU の関数は外の変数を使わない（Web Worker に文字列で�
     assert.ok(move && typeof move.from === "number");
 });
 
+console.log("[詰め問題]");
+
+const PUZZLES = require(path.join(__dirname, "..", "games", "utsuroi", "puzzles.js"));
+
+test("問題データが読める・ID が重ならない", () => {
+    assert.ok(PUZZLES.length >= 10);
+    assert.equal(new Set(PUZZLES.map(p => p.id)).size, PUZZLES.length);
+    PUZZLES.forEach(p => {
+        const position = E.decodePosition(p);
+        assert.equal(E.countPieces(position.board, BLACK) > 0 && E.countPieces(position.board, WHITE) > 0, true, p.id);
+        assert.ok(position.ply + p.moves * 2 < MAX_PLY, `${p.id} は手数切れにかからない`);
+    });
+});
+
+test("どの問題も「決められた手数で勝てる最初の一手」が 1 つだけで、答えと一致する", () => {
+    PUZZLES.forEach(p => {
+        const position = E.decodePosition(p);
+        const wins = E.winningMoves(position, p.moves * 2 - 1);
+        assert.equal(wins.length, 1, `${p.id}: 勝ちの手が ${wins.length} 個`);
+        assert.deepEqual({ from: wins[0].from, to: wins[0].to }, p.solution, p.id);
+        if (p.moves > 1) {
+            assert.equal(E.winningMoves(position, p.moves * 2 - 3).length, 0, `${p.id}: もっと短い手数で勝てる`);
+        }
+    });
+});
+
+test("答えの手を指すと、相手はどう受けても負け（読み切り）", () => {
+    PUZZLES.forEach(p => {
+        const after = E.applyMove(E.decodePosition(p), p.solution);
+        if (p.moves === 1) {
+            assert.equal(after.result && after.result.winner, after.turn === BLACK ? WHITE : BLACK, p.id);
+            return;
+        }
+        const analysis = E.analyzePosition(after, (p.moves - 1) * 2);
+        assert.ok(analysis.outcome && !analysis.outcome.win, p.id);
+        assert.ok(analysis.outcome.plies <= (p.moves - 1) * 2, p.id);
+    });
+});
+
+test("局面の文字列化は元に戻せる・壊れたデータは受け付けない", () => {
+    const position = E.newGame(77);
+    const decoded = E.decodePosition(E.encodePosition(position));
+    assert.deepEqual(decoded.board, position.board);
+    assert.deepEqual(decoded.tiles, position.tiles);
+    assert.throws(() => E.decodePosition({ tiles: "123", board: "...", turn: "b" }));
+    assert.throws(() => E.decodePosition({ tiles: "9".repeat(CELLS), board: ".".repeat(CELLS), turn: "b" }));
+});
+
 console.log();
 if (failed === 0) {
     console.log("すべて OK");

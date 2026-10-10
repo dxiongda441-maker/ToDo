@@ -9,6 +9,8 @@
     const RECORD_KEY = "utsuroi.record.v1";
     const GAME_KEY = "utsuroi.game.v1";
     const SEEN_RULES_KEY = "utsuroi.seenRules.v1";
+    const PUZZLE_KEY = "utsuroi.puzzles.v1";
+    const PUZZLES = Array.isArray(window.UTSUROI_PUZZLES) ? window.UTSUROI_PUZZLES : [];
     const CPU_MIN_DELAY = 450;
     const COLUMNS = "abcdefg";
     const SIDE_NAME = { [BLACK]: "黒", [WHITE]: "白" };
@@ -40,6 +42,9 @@
     const swapText = $("#swap-text");
     const resultDialog = $("#result-dialog");
     const rulesDialog = $("#rules-dialog");
+    const puzzleDialog = $("#puzzle-dialog");
+    const puzzleCard = $("#puzzle-card");
+    const codeCard = $("#code-card");
 
     // ---------- 保存（使えない環境でも遊べるように失敗は無視する） ----------
     function load(key, fallback) {
@@ -80,11 +85,13 @@
         flipManual: false,
         thinking: false,
         token: 0,
-        recorded: false
+        recorded: false,
+        puzzle: null // 詰め問題を解いているときの問題データ
     };
 
     const current = () => game.history[game.history.length - 1];
-    const isCpuTurn = () => game.mode === "cpu" && current().turn !== game.human && !current().result;
+    // mode は "cpu"（CPU 対戦）/ "local"（2 人対戦）/ "puzzle"（詰め問題。相手は CPU）
+    const isCpuTurn = () => game.mode !== "local" && current().turn !== game.human && !current().result;
     const isHumanTurn = () => !current().result && (game.mode === "local" || current().turn === game.human);
 
     function squareName(index) {
@@ -92,7 +99,7 @@
     }
 
     function playerLabel(side) {
-        if (game.mode === "cpu") {
+        if (game.mode !== "local") {
             return side === game.human ? "あなた" : "CPU";
         }
         return game.names[side];
@@ -184,7 +191,7 @@
         // 取られそうな駒・取れる駒（自分の側から見て）
         let inDanger = new Set();
         let canCapture = new Set();
-        const viewer = game.mode === "cpu" ? game.human : position.turn;
+        const viewer = game.mode !== "local" ? game.human : position.turn;
         if (dangerToggle.checked && !position.result) {
             inDanger = threatsAgainst(position, viewer);
             canCapture = threatsAgainst(position, -viewer);
@@ -258,6 +265,8 @@
         renderSelection();
         renderLog();
         boardCodeEl.textContent = E.seedToCode(position.seed);
+        codeCard.hidden = game.mode === "puzzle";
+        renderPuzzleCard();
         undoButton.disabled = game.history.length <= 1 || game.thinking;
         hintButton.disabled = !isHumanTurn() || game.thinking;
     }
@@ -308,6 +317,8 @@
             status = describeResult(position.result).title;
         } else if (game.thinking) {
             status = "CPU が考えています…";
+        } else if (game.mode === "puzzle") {
+            status = `あなたの番（${SIDE_NAME[game.human]}）。あと ${puzzleMovesLeft()} 手以内に勝ってください。`;
         } else if (game.mode === "cpu") {
             status = game.selected === null
                 ? `あなたの番です（${SIDE_NAME[game.human]}）。動かす駒を選んでください。`
@@ -465,6 +476,10 @@
 
     async function afterMove() {
         const position = current();
+        if (game.mode === "puzzle") {
+            puzzleAfterMove();
+            return;
+        }
         if (position.result) {
             finishGame();
             return;
@@ -585,6 +600,8 @@ self.onmessage = event => {
     let result = null;
     if (data.kind === "move") {
         result = engine.chooseMove(data.position, data.options);
+    } else if (data.kind === "analyze") {
+        result = engine.analyzePosition(data.position, data.options.depth);
     } else if (data.kind === "swap") {
         result = engine.shouldSwap(data.position, data.options);
     }
@@ -612,6 +629,9 @@ self.onmessage = event => {
     }
 
     function computeHere(kind, position, options) {
+        if (kind === "analyze") {
+            return E.analyzePosition(position, options.depth);
+        }
         return kind === "move" ? E.chooseMove(position, options) : E.shouldSwap(position, options);
     }
 
@@ -673,9 +693,20 @@ self.onmessage = event => {
         }
 
         const description = describeResult(result);
-        $("#result-emoji").textContent = description.emoji;
-        $("#result-title").textContent = description.title;
-        $("#result-text").textContent = description.text;
+        showResult(description.emoji, description.title, description.text, [
+            ["review", "盤面を見る"],
+            ["same", "同じ盤でもう一度"],
+            ["new", "新しい盤で", true]
+        ]);
+    }
+
+    function showResult(emoji, title, text, buttons) {
+        $("#result-emoji").textContent = emoji;
+        $("#result-title").textContent = title;
+        $("#result-text").textContent = text;
+        $("#result-actions").innerHTML = buttons
+            .map(([value, label, primary]) => `<button type="submit" class="${primary ? "primary" : "secondary"}" value="${value}">${label}</button>`)
+            .join("");
         render();
         setTimeout(() => {
             if (!resultDialog.open) {
@@ -690,8 +721,201 @@ self.onmessage = event => {
             startGame(Object.assign({}, settings, { seed: current().seed }));
         } else if (choice === "new") {
             startGame(Object.assign({}, settings, { seed: null }));
+        } else if (choice === "puzzle-next") {
+            startPuzzle(nextPuzzle());
+        } else if (choice === "puzzle-list") {
+            openPuzzleList();
         }
     });
+
+    // ---------- 詰め問題 ----------
+    function loadSolved() {
+        const solved = load(PUZZLE_KEY, {});
+        return solved && typeof solved === "object" ? solved : {};
+    }
+
+    // あと何手（自分の手）で勝たなければならないか
+    function puzzleMovesLeft() {
+        if (!game.puzzle) {
+            return 0;
+        }
+        const myMoves = Math.ceil((game.history.length - 1) / 2);
+        return game.puzzle.moves - myMoves;
+    }
+
+    function puzzleLabel(puzzle) {
+        const group = PUZZLES.filter(p => p.moves === puzzle.moves);
+        return `${puzzle.moves} 手で勝ち・第 ${group.indexOf(puzzle) + 1} 問`;
+    }
+
+    function renderPuzzleCard() {
+        puzzleCard.hidden = game.mode !== "puzzle";
+        if (game.mode !== "puzzle") {
+            return;
+        }
+        const puzzle = game.puzzle;
+        $("#puzzle-title").textContent = `詰め問題（${puzzleLabel(puzzle)}）`;
+        const solved = loadSolved()[puzzle.id] ? "（解いたことがあります ✓）" : "";
+        $("#puzzle-text").textContent = `${SIDE_NAME[game.human]}番です。${puzzle.moves} 手以内に勝ってください。相手（CPU）は最善の受けをします。${solved}`;
+    }
+
+    function nextPuzzle() {
+        if (PUZZLES.length === 0) {
+            return null;
+        }
+        const solved = loadSolved();
+        const start = game.puzzle ? PUZZLES.indexOf(game.puzzle) + 1 : 0;
+        for (let k = 0; k < PUZZLES.length; k += 1) {
+            const candidate = PUZZLES[(start + k) % PUZZLES.length];
+            if (!solved[candidate.id]) {
+                return candidate;
+            }
+        }
+        return PUZZLES[start % PUZZLES.length];
+    }
+
+    function startPuzzle(puzzle) {
+        if (!puzzle) {
+            return;
+        }
+        const position = E.decodePosition(puzzle);
+        game.token += 1;
+        game.mode = "puzzle";
+        game.puzzle = puzzle;
+        game.level = "hard";
+        game.handicap = null;
+        game.swapEnabled = false;
+        game.swapTaken = null;
+        game.human = position.turn;
+        game.startHuman = position.turn;
+        game.history = [position];
+        game.moves = [];
+        game.selected = null;
+        game.hint = null;
+        game.thinking = false;
+        game.recorded = true;
+        game.flipManual = false;
+        game.flipped = game.human === WHITE;
+        render();
+    }
+
+    async function puzzleAfterMove() {
+        const position = current();
+        if (position.result) {
+            finishPuzzle(position.result.winner === game.human);
+            return;
+        }
+        if (position.turn === game.human) {
+            render();
+            return;
+        }
+
+        // 人が指した直後：残りの手数で勝ちきれる手だったかを、相手側から読み切って確かめる
+        const movesLeft = puzzleMovesLeft();
+        const token = game.token;
+        let analysis = null;
+        if (movesLeft > 0) {
+            game.thinking = true;
+            render();
+            [analysis] = await Promise.all([
+                askAi("analyze", position, { depth: movesLeft * 2 }),
+                wait(CPU_MIN_DELAY)
+            ]);
+            if (token !== game.token) {
+                return;
+            }
+            game.thinking = false;
+        }
+
+        const stillWinning = analysis && analysis.outcome && !analysis.outcome.win
+            && analysis.outcome.plies <= movesLeft * 2;
+        if (!stillWinning) {
+            // 間違い：その手を取り消して、もう一度考えてもらう
+            game.history.pop();
+            game.moves.pop();
+            render();
+            const message = `その手では ${game.puzzle.moves} 手以内に勝てません。別の手を考えてみましょう。`;
+            statusEl.textContent = message;
+            showToast(message);
+            return;
+        }
+        playMove({ from: analysis.from, to: analysis.to });
+    }
+
+    function finishPuzzle(success) {
+        const puzzle = game.puzzle;
+        if (success) {
+            const solved = loadSolved();
+            solved[puzzle.id] = true;
+            save(PUZZLE_KEY, solved);
+        }
+        const count = Object.keys(loadSolved()).filter(id => PUZZLES.some(p => p.id === id)).length;
+        showResult(
+            success ? "⭕" : "🍵",
+            success ? "正解！" : "残念…",
+            success
+                ? `${puzzleLabel(puzzle)}を解きました（${count} / ${PUZZLES.length} 問）。`
+                : "相手に勝たれてしまいました。もう一度挑戦してみましょう。",
+            [
+                ["review", "盤面を見る"],
+                ["puzzle-list", "問題の一覧"],
+                ["puzzle-next", "次の問題", true]
+            ]
+        );
+    }
+
+    function openPuzzleList() {
+        const solved = loadSolved();
+        const titles = { 1: "1 手で勝ち（入門）", 2: "2 手で勝ち", 3: "3 手で勝ち（上級）" };
+        const groups = [...new Set(PUZZLES.map(p => p.moves))].sort();
+        const list = $("#puzzle-list");
+        list.innerHTML = "";
+        groups.forEach(moves => {
+            const section = document.createElement("section");
+            section.className = "puzzle-group";
+            const heading = document.createElement("h3");
+            heading.textContent = titles[moves] || `${moves} 手で勝ち`;
+            const buttons = document.createElement("div");
+            buttons.className = "puzzle-buttons";
+            PUZZLES.filter(p => p.moves === moves).forEach((puzzle, i) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "puzzle-button";
+                button.textContent = String(i + 1);
+                button.classList.toggle("solved", Boolean(solved[puzzle.id]));
+                button.setAttribute("aria-label", `${heading.textContent} 第 ${i + 1} 問${solved[puzzle.id] ? "（解いた）" : ""}`);
+                button.addEventListener("click", () => {
+                    puzzleDialog.close();
+                    startPuzzle(puzzle);
+                });
+                buttons.appendChild(button);
+            });
+            section.append(heading, buttons);
+            list.appendChild(section);
+        });
+        const count = Object.keys(solved).filter(id => PUZZLES.some(p => p.id === id)).length;
+        $("#puzzle-progress").textContent = `解いた問題：${count} / ${PUZZLES.length}`;
+        if (!puzzleDialog.open) {
+            puzzleDialog.showModal();
+        }
+    }
+
+    // 保存してある対局に戻る（無ければ新しく始める）
+    function resumeSavedOrNew() {
+        game.puzzle = null;
+        if (restoreGame()) {
+            render();
+            if (current().result) {
+                statusEl.textContent = `${describeResult(current().result).title}（前回の対局）`;
+            } else if (game.swapEnabled && E.canOfferSwap(current()) && game.swapTaken === null) {
+                afterMove();
+            } else if (isCpuTurn()) {
+                runCpu();
+            }
+        } else {
+            startGame(settings);
+        }
+    }
 
     // ---------- 開始・待った・ヒント ----------
     function resolveSide(side) {
@@ -740,6 +964,7 @@ self.onmessage = event => {
 
     function resetGameState(options) {
         game.token += 1;
+        game.puzzle = null;
         game.mode = options.mode === "local" ? "local" : "cpu";
         game.level = E.LEVELS[options.level] ? options.level : "normal";
         game.startHuman = options.startHuman !== undefined ? options.startHuman : resolveSide(options.side);
@@ -801,7 +1026,7 @@ self.onmessage = event => {
         };
 
         popOne();
-        if (game.mode === "cpu") {
+        if (game.mode !== "local") {
             // 自分の番まで戻す
             while (game.history.length > 1 && current().turn !== game.human) {
                 popOne();
@@ -837,6 +1062,9 @@ self.onmessage = event => {
 
     // ---------- 対局の保存と再開 ----------
     function saveGame() {
+        if (game.mode === "puzzle") {
+            return; // 詰め問題は保存しない（保存してある対局を上書きしない）
+        }
         save(GAME_KEY, {
             version: 1,
             seed: current().seed,
@@ -966,6 +1194,8 @@ self.onmessage = event => {
                 const target = document.getElementById(button.dataset.open);
                 if (target === setupDialog) {
                     openSetup();
+                } else if (target === puzzleDialog) {
+                    openPuzzleList();
                 } else if (target) {
                     target.showModal();
                 }
@@ -995,18 +1225,11 @@ self.onmessage = event => {
             }
         });
 
-        if (restoreGame()) {
-            render();
-            if (current().result) {
-                statusEl.textContent = `${describeResult(current().result).title}（前回の対局）`;
-            } else if (game.swapEnabled && E.canOfferSwap(current()) && game.swapTaken === null) {
-                afterMove();
-            } else if (isCpuTurn()) {
-                runCpu();
-            }
-        } else {
-            startGame(settings);
-        }
+        $("#puzzle-retry").addEventListener("click", () => startPuzzle(game.puzzle));
+        $("#puzzle-next").addEventListener("click", () => startPuzzle(nextPuzzle()));
+        $("#puzzle-exit").addEventListener("click", resumeSavedOrNew);
+
+        resumeSavedOrNew();
 
         if (!load(SEEN_RULES_KEY, false)) {
             save(SEEN_RULES_KEY, true);

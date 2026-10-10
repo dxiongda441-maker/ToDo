@@ -37,7 +37,8 @@ ToDo/
 │   ├── check.sh             基本チェック（bash tools/check.sh）。ゲームのテストも動かす
 │   ├── browser-check.js     ブラウザで実際に操作して確かめる（Playwright がある環境だけ）
 │   ├── test-utsuroi.js      ゲームのルールと CPU のテスト
-│   └── utsuroi-selfplay.js  ゲームの CPU 同士の対局で、ルールの釣り合いを調べる
+│   ├── utsuroi-selfplay.js  ゲームの CPU 同士の対局で、ルールの釣り合いを調べる
+│   └── utsuroi-make-puzzles.js  ゲームの詰め問題を作る
 ├── games/
 │   └── utsuroi/      盤上戦略ゲーム「うつろい」（README.md に詳しい説明）
 ├── .github/          自動チェックとプルリクエストのひな形

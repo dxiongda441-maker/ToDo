@@ -853,6 +853,59 @@ input {
     letter-spacing: 0.08em;
 }
 
+/* ---------- 詰め問題 ---------- */
+.puzzle-card {
+    border-color: #16a34a;
+    box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25);
+}
+
+.puzzle-card[hidden],
+.card[hidden] {
+    display: none;
+}
+
+.puzzle-list {
+    display: grid;
+    gap: 14px;
+    margin: 12px 0;
+}
+
+.puzzle-group h3 {
+    margin: 0 0 6px;
+    font-size: 0.95rem;
+}
+
+.puzzle-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.puzzle-button {
+    min-width: 52px;
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface-2);
+    cursor: pointer;
+    font-variant-numeric: tabular-nums;
+}
+
+.puzzle-button:hover {
+    border-color: var(--accent);
+}
+
+.puzzle-button.solved {
+    background: rgba(22, 163, 74, 0.16);
+    border-color: rgba(22, 163, 74, 0.5);
+}
+
+.puzzle-button.solved::after {
+    content: " ✓";
+    color: #16a34a;
+    font-weight: 700;
+}
+
 /* ---------- お知らせ ---------- */
 .toast {
     position: fixed;

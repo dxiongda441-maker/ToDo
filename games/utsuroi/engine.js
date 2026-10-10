@@ -340,10 +340,23 @@ function createUtsuroiEngine() {
     const WIN = 1000000;
     const WIN_THRESHOLD = WIN - 1000;
     const STONE_VALUE = 100;
+    // 王から相手の玉座までの距離（王は 8 方向に 1 歩なので、縦横の差の大きい方）
+    const THRONE_DISTANCE = { [BLACK]: [], [WHITE]: [] };
+    [BLACK, WHITE].forEach(side => {
+        const throne = goalRow(side) * SIZE + Math.floor(SIZE / 2);
+        for (let i = 0; i < CELLS; i += 1) {
+            THRONE_DISTANCE[side].push(Math.max(
+                Math.abs(rowOf(i) - rowOf(throne)),
+                Math.abs(colOf(i) - colOf(throne))
+            ));
+        }
+    });
+
     const DEFAULT_WEIGHTS = {
         tileStone: [4, 4, 12, 16],
         tileKing: [6, 6, 14, 18],
         kingAdvance: 5,
+        kingThrone: 0,
         mobility: 3,
         threat: 6,
         tempo: 8
@@ -533,9 +546,11 @@ function createUtsuroiEngine() {
                 } else if (piece === -1) {
                     score -= STONE_VALUE + weights.tileStone[tile];
                 } else if (piece === 2) {
-                    score += weights.tileKing[tile] + weights.kingAdvance * (SIZE - 1 - rowOf(i));
+                    score += weights.tileKing[tile] + weights.kingAdvance * (SIZE - 1 - rowOf(i))
+                        + weights.kingThrone * (SIZE - 1 - THRONE_DISTANCE[BLACK][i]);
                 } else {
-                    score -= weights.tileKing[tile] + weights.kingAdvance * rowOf(i);
+                    score -= weights.tileKing[tile] + weights.kingAdvance * rowOf(i)
+                        + weights.kingThrone * (SIZE - 1 - THRONE_DISTANCE[WHITE][i]);
                 }
             }
             const black = mobilityAndThreats(BLACK);
@@ -982,6 +997,79 @@ function createUtsuroiEngine() {
         });
     }
 
+    // 読み切れたときの決着までの手数（両者あわせて）。score は手番側から見た点数。
+    // 例：すぐ勝てる → { win: true, plies: 1 }、相手に次の手で勝たれる → { win: false, plies: 2 }
+    function outcomeFromScore(score) {
+        if (typeof score !== "number" || Math.abs(score) <= WIN_THRESHOLD) {
+            return null;
+        }
+        return { win: score > 0, plies: WIN - Math.abs(score) + 1 };
+    }
+
+    // 手番側の手のうち、depth 手（両者あわせて）以内に勝ちが決まる手を、決着の早い順に返す。
+    // 詰め問題の作成と確認に使う（時間制限なし）
+    function winningMoves(position, depth) {
+        ensureTable();
+        clearTable();
+        const searcher = createSearcher(position, {});
+        return searcher.scoreRootMoves(depth)
+            .map(entry => Object.assign(decodeMove(entry.move), { outcome: outcomeFromScore(entry.score) }))
+            .filter(entry => entry.outcome && entry.outcome.win && entry.outcome.plies <= depth)
+            .sort((a, b) => a.outcome.plies - b.outcome.plies);
+    }
+
+    // depth 手まで時間制限なしで読み、最善手と読み切り結果を返す（詰め問題の判定用。depth は小さく）
+    function analyzePosition(position, depth) {
+        if (position.result) {
+            return null;
+        }
+        ensureTable();
+        clearTable();
+        const searcher = createSearcher(position, {});
+        const best = searcher.searchBest(depth);
+        if (best.move < 0) {
+            return null;
+        }
+        return Object.assign(decodeMove(best.move), { score: best.score, outcome: outcomeFromScore(best.score) });
+    }
+
+    // ---------- 詰め問題の局面を短い文字列にする ----------
+    const PIECE_CHARS = { 0: ".", 1: "b", 2: "B", [-1]: "w", [-2]: "W" };
+    const CHAR_PIECES = { ".": 0, b: 1, B: 2, w: -1, W: -2 };
+
+    function encodePosition(position) {
+        return {
+            tiles: position.tiles.join(""),
+            board: position.board.map(piece => PIECE_CHARS[piece]).join(""),
+            turn: position.turn === BLACK ? "b" : "w",
+            ply: position.ply
+        };
+    }
+
+    function decodePosition(data) {
+        if (!data || typeof data.tiles !== "string" || typeof data.board !== "string"
+            || data.tiles.length !== CELLS || data.board.length !== CELLS) {
+            throw new Error("Invalid position data");
+        }
+        const tiles = data.tiles.split("").map(Number);
+        const board = data.board.split("").map(ch => CHAR_PIECES[ch]);
+        if (tiles.some(t => !(t >= 0 && t < TILE_TYPES)) || board.some(p => p === undefined)) {
+            throw new Error("Invalid position data");
+        }
+        return {
+            seed: 0,
+            tiles,
+            board,
+            turn: data.turn === "w" ? WHITE : BLACK,
+            ply: Number(data.ply) || 0,
+            result: null,
+            lastMove: null,
+            handicap: null,
+            startBlack: SIZE,
+            startWhite: SIZE
+        };
+    }
+
     // 局面の形勢（先手から見た点数）。ヒント表示用
     function evaluatePosition(position) {
         ensureTable();
@@ -1034,6 +1122,11 @@ function createUtsuroiEngine() {
         randomSeed,
         countPieces,
         lostPieces,
+        outcomeFromScore,
+        winningMoves,
+        analyzePosition,
+        encodePosition,
+        decodePosition,
         MAX_HANDICAP
     };
 }
