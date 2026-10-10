@@ -940,6 +940,20 @@
                 ctx.fillRect(7, 1, 2, 8);
                 ctx.fillRect(5, 3, 6, 2);
             },
+            // つぼ
+            "o": ctx => {
+                TILE_PAINTERS.town["_"](ctx);
+                ctx.fillStyle = "#5a3416";
+                ctx.fillRect(4, 4, 8, 11);
+                ctx.fillRect(3, 6, 10, 7);
+                ctx.fillStyle = "#9a6a3a";
+                ctx.fillRect(5, 5, 6, 9);
+                ctx.fillRect(4, 7, 8, 5);
+                ctx.fillStyle = "#c08a52";
+                ctx.fillRect(6, 7, 2, 3);
+                ctx.fillStyle = "#3a200c";
+                ctx.fillRect(5, 2, 6, 2);
+            },
             "b": ctx => {
                 TILE_PAINTERS.town["_"](ctx);
                 ctx.fillStyle = "#e8e8f0";

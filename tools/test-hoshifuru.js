@@ -35,10 +35,10 @@ function seededRng(seed) {
 }
 
 // game.js と同じ「通れないマス」
-const BLOCKED = { world: "^~", town: "T#c~Ab", cave: "#X*", tower: "#X*", shrine: "#~X*", castle: "#X*K" };
+const BLOCKED = { world: "^~", town: "T#c~Abo", cave: "#X*", tower: "#X*", shrine: "#~X*", castle: "#X*K" };
 const KNOWN = {
     world: ".T^~:,=abL123cwsk",
-    town: ",.T#_Dc~fAb",
+    town: ",.T#_Dc~fAbo",
     cave: ".#E<>X*B",
     tower: ".#E<>X*B",
     shrine: ".#~E<>X*B",
@@ -154,6 +154,22 @@ test("ボスのマスと しずくの台が 正しい場所にある", () => {
             assert.equal(tileAt(map, map.pedestal.x, map.pedestal.y), "*", `${id} の台`);
             assert.ok(data.items[map.pedestal.item].key);
         }
+    });
+});
+
+test("つぼのマスと中身が 1 対 1 で、中身は実在する", () => {
+    Object.entries(maps).forEach(([id, map]) => {
+        const pots = map.pots || {};
+        map.rows.forEach((row, y) => row.split("").forEach((ch, x) => {
+            if (ch === "o") {
+                assert.ok(pots[`${x},${y}`], `${id} の (${x},${y}) の つぼに 中身がない`);
+            }
+        }));
+        Object.entries(pots).forEach(([key, content]) => {
+            const [x, y] = key.split(",").map(Number);
+            assert.equal(tileAt(map, x, y), "o", `${id} ${key} は つぼではない`);
+            assert.ok(content.gold > 0 || data.items[content.item], `${id} ${key} の 中身`);
+        });
     });
 });
 

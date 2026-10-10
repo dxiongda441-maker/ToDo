@@ -496,7 +496,7 @@
 
     const BLOCKED = {
         world: "^~",
-        town: "T#c~Ab",
+        town: "T#c~Abo",
         cave: "#X*",
         tower: "#X*",
         shrine: "#~X*",
@@ -791,6 +791,8 @@
                 await openChest(tx, ty);
             } else if (tileAt(tx, ty) === "*") {
                 await checkPedestal(tx, ty);
+            } else if (tileAt(tx, ty) === "o") {
+                await searchPot(tx, ty);
             } else {
                 busy = false;
                 await fieldMenu();
@@ -837,6 +839,31 @@
 
     function chestKey(x, y) {
         return `${game.map}:${x},${y}`;
+    }
+
+    // つぼを しらべる（なかみは 1 回だけ。宝箱と おなじ 記録に のこす）
+    async function searchPot(x, y) {
+        const key = `${game.map}:pot:${x},${y}`;
+        const content = (currentMap().pots || {})[`${x},${y}`];
+        await say(`${game.party[0].name}は つぼの なかを のぞきこんだ。`);
+        if (!content || game.chests[key]) {
+            await say("しかし なにも なかった。");
+            return;
+        }
+        if (content.gold) {
+            game.gold += content.gold;
+            game.chests[key] = true;
+            audio.se("chest");
+            await say(`なんと ${content.gold}ゴールドを みつけた！`);
+            return;
+        }
+        if (!R.addItem(game.bag, content.item)) {
+            await say(`${data.items[content.item].name}が 入っているが、どうぐぶくろが いっぱいだ。`);
+            return;
+        }
+        game.chests[key] = true;
+        audio.se("chest");
+        await say(`なんと ${data.items[content.item].name}を みつけた！`);
     }
 
     async function openChest(x, y) {
