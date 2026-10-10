@@ -177,6 +177,29 @@ body.dark .toast {
     color: #64748b;
 }
 
+.backup-age {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.backup-age:empty {
+    display: none;
+}
+
+.backup-age.stale {
+    color: #b45309;
+    font-weight: 600;
+}
+
+body.dark .backup-age {
+    color: #cbd5f5;
+}
+
+body.dark .backup-age.stale {
+    color: #fbbf24;
+}
+
 body.dark .backup-note {
     color: #cbd5f5;
 }

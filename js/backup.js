@@ -4,6 +4,9 @@ window.TodoApp = window.TodoApp || {};
 TodoApp.backup = (() => {
     const BACKUP_FORMAT = "todo-backup";
     const BACKUP_VERSION = 1;
+    const LAST_EXPORT_KEY = "todo.lastExport.v1"; // 最後に 書き出した 日時（ミリ秒）
+    const REMIND_AFTER_DAYS = 14;
+    const DAY = 24 * 60 * 60 * 1000;
 
     const state = TodoApp.state;
     const storage = TodoApp.storage;
@@ -13,6 +16,7 @@ TodoApp.backup = (() => {
     const exportButton = document.querySelector("#export-button");
     const importButton = document.querySelector("#import-button");
     const importFile = document.querySelector("#import-file");
+    const ageEl = document.querySelector("#backup-age");
     const enabled = Boolean(exportButton && importButton && importFile);
 
     function buildBackup() {
@@ -39,7 +43,35 @@ TodoApp.backup = (() => {
         link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
 
+        try {
+            localStorage.setItem(LAST_EXPORT_KEY, String(Date.now()));
+        } catch (_error) {
+            // 覚えられなくても 書き出しは できている
+        }
+        renderAge();
         toast.show(`Exported ${state.tasks.length} tasks and ${state.archivedTasks.length} history items`);
+    }
+
+    // 最後に バックアップした のは いつか。しばらく していなければ 目立たせる
+    function renderAge() {
+        if (!ageEl) {
+            return;
+        }
+        let last = NaN;
+        try {
+            last = Number(localStorage.getItem(LAST_EXPORT_KEY));
+        } catch (_error) {
+            last = NaN;
+        }
+        const hasData = state.tasks.length + state.archivedTasks.length > 0;
+        if (!Number.isFinite(last) || last <= 0) {
+            ageEl.textContent = hasData ? "You have not exported a backup yet." : "";
+            ageEl.classList.toggle("stale", hasData);
+            return;
+        }
+        const days = Math.floor((Date.now() - last) / DAY);
+        ageEl.textContent = days <= 0 ? "Last backup: today." : `Last backup: ${days} ${days === 1 ? "day" : "days"} ago.`;
+        ageEl.classList.toggle("stale", hasData && days >= REMIND_AFTER_DAYS);
     }
 
     // 取り込み：同じ ID のものは今のデータを優先し、無いものだけ追加する
@@ -126,7 +158,8 @@ TodoApp.backup = (() => {
         exportButton.addEventListener("click", exportData);
         importButton.addEventListener("click", () => importFile.click());
         importFile.addEventListener("change", handleFileChosen);
+        renderAge();
     }
 
-    return { init, importFromText };
+    return { init, importFromText, refresh: renderAge };
 })();

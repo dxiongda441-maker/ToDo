@@ -148,7 +148,9 @@ async function checkTodo(browser, width) {
     await page.click(".history-item:has-text('Write report') .history-restore");
     check((await texts(page)).includes("Write report"), "履歴から復元できる");
 
+    check((await page.textContent("#backup-age")).includes("not exported"), "まだ バックアップしていないと 知らせる");
     const [download] = await Promise.all([page.waitForEvent("download"), page.click("#export-button")]);
+    check((await page.textContent("#backup-age")) === "Last backup: today.", "バックアップした日が 出る");
     const backupPath = path.join(os.tmpdir(), `todo-backup-check-${process.pid}.json`);
     await download.saveAs(backupPath);
     await page.evaluate(() => localStorage.clear());

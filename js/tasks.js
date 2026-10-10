@@ -477,6 +477,10 @@ TodoApp.tasks = (() => {
         updateClearButtonState();
         renderTagBar();
         TodoApp.history.refresh();
+        // backup.js は このファイルより 後に 読み込まれるので、あるときだけ 呼ぶ
+        if (TodoApp.backup) {
+            TodoApp.backup.refresh();
+        }
     }
 
     function updateSummary() {
