@@ -6,6 +6,7 @@
 
 - タスクの追加・完了・その場で編集（Enter で保存、Esc で取り消し）・削除
 - 期限日（任意）。「Overdue（期限切れ）」「Due today」「Due tomorrow」を色と文字で表示
+- くり返し（任意）：Daily / Weekdays / Weekly / Monthly。終えると、次の期限日のタスクがすぐ上にできる（お知らせの Undo で取り消せる）
 - 検索・フィルター（All / Active / Completed）・並び順（自分で決めた順 / 期限日順）・完了率のバー・期限切れの件数
 - 並べ替え：左のつまみをドラッグ（マウス・タッチ）、またはつまみにフォーカスして ↑↓、タスクのどこかにフォーカスして Alt+↑↓
 - タグ：本文に `#仕事` のように書くとタグになる。タグを押すか、上のタグ一覧から選ぶと、そのタグのタスクだけを表示（もう一度押すと解除）
@@ -30,7 +31,7 @@
 
 | localStorage のキー | 中身 |
 | --- | --- |
-| `todo.tasks.v1` | 今のタスク一覧 `{ id, text, completed, createdAt, dueDate? }`（`dueDate` は `"YYYY-MM-DD"`、無ければ項目ごと省く） |
+| `todo.tasks.v1` | 今のタスク一覧 `{ id, text, completed, createdAt, dueDate?, repeat?, nextId? }`（`dueDate` は `"YYYY-MM-DD"`、無ければ項目ごと省く。`repeat` は `daily`/`weekdays`/`weekly`/`monthly`、`nextId` は終えたときに作った次のタスクの ID） |
 | `todo.archive.v1` | 削除・一括削除したタスク（上の項目 ＋ `deletedAt`・`reason`） |
 | `todo.theme.v1` | 配色の設定（`auto` / `light` / `dark`） |
 | `todo.sort.v1` | 並び順（`added`＝自分で決めた順 / `due`＝期限日順）。自分で決めた順はタスク一覧の配列の順番そのもの |

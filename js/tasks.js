@@ -10,6 +10,7 @@ TodoApp.tasks = (() => {
     const form = document.querySelector("#todo-form");
     const input = document.querySelector("#task-input");
     const dueInput = document.querySelector("#due-input");
+    const repeatInput = document.querySelector("#repeat-input");
     const searchInput = document.querySelector("#search-input");
     const sortSelect = document.querySelector("#sort-select");
     const overdueCountEl = document.querySelector("#overdue-count");
@@ -32,7 +33,9 @@ TodoApp.tasks = (() => {
         completed: "No completed tasks yet."
     };
 
-    function createTask(text, dueDate) {
+    const REPEAT_LABELS = { daily: "daily", weekdays: "on weekdays", weekly: "weekly", monthly: "monthly" };
+
+    function createTask(text, dueDate, repeat) {
         const trimmed = text.trim();
         if (!trimmed) {
             return null;
@@ -49,8 +52,74 @@ TodoApp.tasks = (() => {
         if (due) {
             task.dueDate = due;
         }
+        applyRepeat(task, repeat);
 
         return task;
+    }
+
+    // くり返しを 設定する。期限日が 無ければ 今日を 期限日にする（次の日を 数える もとに なる）
+    function applyRepeat(task, repeat) {
+        if (storage.REPEAT_MODES.includes(repeat)) {
+            task.repeat = repeat;
+            if (!task.dueDate) {
+                task.dueDate = toDateKey(Date.now());
+            }
+        } else {
+            delete task.repeat;
+        }
+    }
+
+    // くり返しの 次の 期限日。もとの 期限日から 1 回ずつ 進め、今日より 後に なるまで 進める
+    function nextDueDate(task) {
+        const base = createDateFromKey(task.dueDate) || new Date();
+        const todayKey = toDateKey(Date.now());
+        const step = date => {
+            const next = new Date(date.getTime());
+            if (task.repeat === "daily") {
+                next.setDate(next.getDate() + 1);
+            } else if (task.repeat === "weekdays") {
+                do {
+                    next.setDate(next.getDate() + 1);
+                } while (next.getDay() === 0 || next.getDay() === 6);
+            } else if (task.repeat === "weekly") {
+                next.setDate(next.getDate() + 7);
+            } else {
+                // 毎月：同じ日。31 日のように 無い日は その月の 最後の日
+                const day = base.getDate();
+                next.setDate(1);
+                next.setMonth(next.getMonth() + 1);
+                const last = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+                next.setDate(Math.min(day, last));
+            }
+            return next;
+        };
+        let next = step(base);
+        while (toDateKey(next) <= todayKey) {
+            next = step(next);
+        }
+        return toDateKey(next);
+    }
+
+    // くり返しの タスクを 終えたら、次の タスクを すぐ下に 作る（Undo で 取り消せる）
+    function spawnNext(task) {
+        if (!task.repeat || (task.nextId && findTask(task.nextId))) {
+            return;
+        }
+        const next = createTask(task.text, nextDueDate(task), task.repeat);
+        const index = state.tasks.indexOf(task);
+        state.tasks.splice(index, 0, next);
+        task.nextId = next.id;
+        const label = formatShortDate(createDateFromKey(next.dueDate));
+        toast.show(`Next one is due ${label}`, {
+            actionLabel: "Undo",
+            onAction: () => {
+                state.tasks = state.tasks.filter(item => item.id !== next.id);
+                task.completed = false;
+                delete task.nextId;
+                storage.saveTasks();
+                renderTasks();
+            }
+        });
     }
 
     function findTask(id) {
@@ -248,6 +317,7 @@ TodoApp.tasks = (() => {
             id: editor.dataset.id,
             text: editor.querySelector(".task-edit-text").value,
             dueDate: editor.querySelector(".task-edit-due").value,
+            repeat: editor.querySelector(".task-edit-repeat").value,
             hadFocus: editor.contains(document.activeElement)
         };
     }
@@ -269,6 +339,14 @@ TodoApp.tasks = (() => {
         dateInput.value = draft ? draft.dueDate : (task.dueDate || "");
         dateInput.setAttribute("aria-label", "Due date (optional)");
 
+        const repeatSelect = document.createElement("select");
+        repeatSelect.className = "task-edit-repeat";
+        repeatSelect.setAttribute("aria-label", "Repeat");
+        [["", "No repeat"], ["daily", "Daily"], ["weekdays", "Weekdays"], ["weekly", "Weekly"], ["monthly", "Monthly"]].forEach(([value, label]) => {
+            repeatSelect.appendChild(new Option(label, value));
+        });
+        repeatSelect.value = draft ? draft.repeat : (task.repeat || "");
+
         const saveButton = document.createElement("button");
         saveButton.type = "submit";
         saveButton.className = "task-edit-save";
@@ -279,11 +357,11 @@ TodoApp.tasks = (() => {
         cancelButton.className = "task-edit-cancel";
         cancelButton.textContent = "Cancel";
 
-        editor.append(textInput, dateInput, saveButton, cancelButton);
+        editor.append(textInput, dateInput, repeatSelect, saveButton, cancelButton);
 
         editor.addEventListener("submit", event => {
             event.preventDefault();
-            saveEdit(task.id, textInput.value, dateInput.value);
+            saveEdit(task.id, textInput.value, dateInput.value, repeatSelect.value);
         });
 
         cancelButton.addEventListener("click", cancelEdit);
@@ -356,7 +434,7 @@ TodoApp.tasks = (() => {
                 dueEl.hidden = !due;
                 if (due) {
                     dueEl.dateTime = task.dueDate;
-                    dueEl.textContent = due.text;
+                    dueEl.textContent = task.repeat ? `${due.text} · ↻ ${REPEAT_LABELS[task.repeat]}` : due.text;
                     dueEl.className = `task-due task-due--${due.variant}`;
                     item.classList.toggle("overdue", due.variant === "overdue");
                 }
@@ -436,6 +514,9 @@ TodoApp.tasks = (() => {
         }
 
         task.completed = Boolean(completed);
+        if (task.completed) {
+            spawnNext(task);
+        }
         storage.saveTasks();
         renderTasks();
     }
@@ -456,7 +537,7 @@ TodoApp.tasks = (() => {
         focusTaskButton(id, ".edit-button");
     }
 
-    function saveEdit(id, nextText, nextDueDate) {
+    function saveEdit(id, nextText, nextDueDate, nextRepeat) {
         const task = findTask(id);
         state.editingId = null;
         if (!task) {
@@ -478,6 +559,7 @@ TodoApp.tasks = (() => {
         } else {
             delete task.dueDate;
         }
+        applyRepeat(task, nextRepeat);
 
         storage.saveTasks();
         renderTasks();
@@ -735,7 +817,7 @@ TodoApp.tasks = (() => {
 
     function handleFormSubmit(event) {
         event.preventDefault();
-        const task = createTask(input.value, dueInput ? dueInput.value : "");
+        const task = createTask(input.value, dueInput ? dueInput.value : "", repeatInput ? repeatInput.value : "");
         if (!task) {
             input.focus();
             return;
@@ -745,6 +827,9 @@ TodoApp.tasks = (() => {
         input.value = "";
         if (dueInput) {
             dueInput.value = "";
+        }
+        if (repeatInput) {
+            repeatInput.value = "";
         }
         input.focus();
         storage.saveTasks();

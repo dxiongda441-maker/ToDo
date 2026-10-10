@@ -5,6 +5,7 @@ TodoApp.storage = (() => {
     const STORAGE_KEY = "todo.tasks.v1";
     const ARCHIVE_STORAGE_KEY = "todo.archive.v1";
     const DUE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+    const REPEAT_MODES = ["daily", "weekdays", "weekly", "monthly"];
     const state = TodoApp.state;
     const { generateId } = TodoApp.utils;
 
@@ -54,6 +55,16 @@ TodoApp.storage = (() => {
             task.dueDate = dueDate;
         } else if (item.dueDate !== undefined) {
             changed = true;
+        }
+
+        // くり返し（省略可能な項目）。nextId は 完了したときに 作った 次のタスクの ID
+        if (REPEAT_MODES.includes(item.repeat)) {
+            task.repeat = item.repeat;
+        } else if (item.repeat !== undefined) {
+            changed = true;
+        }
+        if (typeof item.nextId === "string" && item.nextId) {
+            task.nextId = item.nextId;
         }
 
         return { task, changed };
@@ -172,6 +183,7 @@ TodoApp.storage = (() => {
         saveArchive,
         normalizeTask,
         normalizeArchiveRecord,
-        normalizeDueDate
+        normalizeDueDate,
+        REPEAT_MODES
     };
 })();

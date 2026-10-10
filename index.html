@@ -20,6 +20,14 @@
             <input id="task-input" name="task" type="text" placeholder="Add a task (try #tags)" title="Shortcut: N" required>
             <label class="visually-hidden" for="due-input">Due date (optional)</label>
             <input id="due-input" name="due" type="date" title="Due date (optional)">
+            <label class="visually-hidden" for="repeat-input">Repeat</label>
+            <select id="repeat-input" name="repeat" class="repeat-select" title="Repeat (optional)">
+                <option value="">No repeat</option>
+                <option value="daily">Daily</option>
+                <option value="weekdays">Weekdays</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+            </select>
             <button type="submit">Add</button>
         </form>
 
@@ -30,7 +38,7 @@
                 <button type="button" class="filter-button" data-filter="completed">Completed</button>
             </div>
             <label class="visually-hidden" for="search-input">Search tasks</label>
-            <input id="search-input" class="search-input" type="search" placeholder="Search tasks ( / )" title="Shortcut: /">
+            <input id="search-input" class="search-input" type="search" placeholder="Search tasks" title="Shortcut: /">
             <label class="visually-hidden" for="sort-select">Sort tasks</label>
             <select id="sort-select" class="sort-select" title="Sort tasks">
                 <option value="added">My order</option>

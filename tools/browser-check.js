@@ -91,6 +91,29 @@ async function checkTodo(browser, width) {
     await page.press(".task-edit-text", "Enter");
     check((await texts(page)).includes("Buy oat milk"), "その場で編集できる");
 
+    // くり返し：毎週の タスクを 終えると、1 週間後の 次の タスクが できる
+    await page.fill("#task-input", "Water plants");
+    await page.selectOption("#repeat-input", "weekly");
+    await page.press("#task-input", "Enter");
+    check((await page.textContent(".task-item:has-text('Water plants') .task-due")).includes("weekly"), "くり返しの タスクを 追加できる");
+    const waterId = await page.evaluate(() => TodoApp.state.tasks.find(t => t.text === "Water plants").id);
+    const toggleById = id => page.click(`.task-item[data-id="${id}"] .task-toggle`);
+    await toggleById(waterId);
+    const nextWeek = await page.evaluate(() => {
+        const date = new Date();
+        date.setDate(date.getDate() + 7);
+        return TodoApp.utils.toDateKey(date);
+    });
+    check(await page.evaluate(key => TodoApp.state.tasks.some(t => t.text === "Water plants" && !t.completed && t.dueDate === key && t.repeat === "weekly"), nextWeek), "終えると 次の くり返しが 1 週間後に できる");
+    await toggleById(waterId);
+    await toggleById(waterId);
+    check(await page.evaluate(() => TodoApp.state.tasks.filter(t => t.text === "Water plants").length === 2), "つけ外ししても 次の タスクは ふえすぎない");
+    await page.evaluate(() => {
+        TodoApp.state.tasks = TodoApp.state.tasks.filter(t => t.text !== "Water plants");
+        TodoApp.storage.saveTasks();
+        TodoApp.tasks.render();
+    });
+
     await page.check(".task-item:has-text('Write report') .task-toggle");
     await page.click("[data-filter=active]");
     check((await texts(page)).join() === "Buy oat milk", "フィルター（Active）");
