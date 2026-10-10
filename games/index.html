@@ -198,7 +198,7 @@
                 const minutes = Math.floor(((save.stats && save.stats.playMs) || 0) / 60000);
                 const hero = save.party[0];
                 show("hoshifuru-progress", [
-                    `${hero.name} Lv ${hero.level}${save.party.length > 1 ? `（仲間 ${save.party.length - 1} 人）` : ""}`,
+                    `${save.plus ? `${save.plus + 1}しゅうめ・` : ""}${hero.name} Lv ${hero.level}${save.party.length > 1 ? `（仲間 ${save.party.length - 1} 人）` : ""}`,
                     save.cleared ? "かげの王を たおした！（クリア済み）" : `ほしのしずく ${drops} / 3`,
                     `プレイ時間 ${Math.floor(minutes / 60)} 時間 ${minutes % 60} 分`
                 ]);
