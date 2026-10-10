@@ -29,11 +29,12 @@ const STAGES = [
     { name: "港町・風の塔", zones: ["field3", "tower"], shops: ["marine_arms", "marine_armor", "marine_items"], join: ["mage", "ルナ", 5], boss: ["arashinooodori"] },
     { name: "森の村・湖の神殿", zones: ["field4", "shrine"], shops: ["leaf_arms", "leaf_items"], join: ["priest", "ミント", 10], boss: ["mizunooohebi"] },
     { name: "かげの城（もんばん）", zones: ["field5", "castle"], shops: ["leaf_arms", "leaf_items"], boss: ["yaminomonban"] },
-    { name: "かげの城（かげの王）", zones: ["castle"], shops: ["leaf_arms", "leaf_items"], boss: ["kagenoou", "kagenoou2"] }
+    { name: "かげの城（かげの王）", zones: ["castle"], shops: ["leaf_arms", "leaf_items"], boss: ["kagenoou", "kagenoou2"] },
+    { name: "星の遺跡（おまけ）", zones: ["ruins"], shops: ["leaf_arms", "leaf_items"], boss: ["hoshikui"], optional: true }
 ];
 
 // 宝箱の装備は、その段階で手に入るものとして扱う
-const CHEST_GEAR = { 1: ["kawanotate"], 2: ["tetsunoyari", "kusarikatabira", "madoushinotsue"], 3: ["tetsunomeisu", "seinarurobu"], 4: ["hikarinoyoroi", "hoshinotsurugi"] };
+const CHEST_GEAR = { 1: ["kawanotate"], 2: ["tetsunoyari", "kusarikatabira", "madoushinotsue"], 3: ["tetsunomeisu", "seinarurobu"], 4: ["hikarinoyoroi", "hoshinotsurugi"], 6: ["ginganoyoroi", "hoshinorobu", "hoshinotsue"] };
 
 function fullHeal(party) {
     party.forEach(m => {
@@ -142,9 +143,12 @@ STAGES.forEach((stage, index) => {
     buyGear(game, stage, index);
     fullHeal(game.party);
     for (let guard = 0; guard < 3000; guard += 1) {
-        const done = stage.boss
-            ? (battles % 10 === 0 && (rate = bossWinRate(game, stage.boss, 30)) >= 0.6)
-            : game.party[0].level >= stage.minLevel;
+        // おまけのボスは 全員が 最大レベルに なるまで 戦ってから 勝率を見る（それ以上は 強くなれない）
+        const done = stage.optional
+            ? game.party.every(m => m.level >= R.MAX_LEVEL) && (rate = bossWinRate(game, stage.boss, 60), true)
+            : stage.boss
+                ? (battles % 10 === 0 && (rate = bossWinRate(game, stage.boss, 30)) >= 0.6)
+                : game.party[0].level >= stage.minLevel;
         if (done) {
             break;
         }

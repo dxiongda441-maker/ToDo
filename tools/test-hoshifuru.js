@@ -305,6 +305,19 @@ test("どうぐ：袋の出し入れと 売値", () => {
     assert.equal(R.sellPrice("shizuku1"), 0);
 });
 
+test("とても強くなると 弱い魔物が おそれをなす（ボス・ぴかりん・強い魔物は にげない）", () => {
+    const rng = seededRng(5);
+    const young = R.createMember("hero", "ユウ", 1, rng);
+    young.equip.weapon = "dounotsurugi";
+    assert.ok(!R.overwhelms([young], ["pururin"]));
+    const veteran = R.createMember("hero", "ユウ", 30, rng);
+    veteran.equip.weapon = "hikarinotsurugi";
+    assert.ok(R.overwhelms([veteran], ["pururin", "koumorin"]));
+    assert.ok(!R.overwhelms([veteran], ["pururin", "pikarin"]));
+    assert.ok(!R.overwhelms([veteran], ["iwaotoko"]));
+    assert.ok(!R.overwhelms([veteran], ["yaminokishi"]));
+});
+
 console.log("[音]");
 
 test("MML：音の高さと長さ", () => {

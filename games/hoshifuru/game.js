@@ -78,8 +78,23 @@
             kills: {},
             seen: {},
             todo: { redeemed: [], day: "", today: 0 },
+            journal: [],
             cleared: false
         };
+    }
+
+    // ぼうけん日誌：できごとを プレイ時間と いっしょに 残す（強くなった足あとを あとで ふりかえれる）
+    function note(text) {
+        if (!game) {
+            return;
+        }
+        const now = performance.now();
+        game.stats.playMs += now - playClock;
+        playClock = now;
+        game.journal.push({ t: Math.round(game.stats.playMs), text });
+        if (game.journal.length > 200) {
+            game.journal.splice(1, game.journal.length - 200);
+        }
     }
 
     let playClock = performance.now();
@@ -98,6 +113,13 @@
         const saved = readJson(SAVE_KEY, null);
         if (!saved || saved.version !== 1 || !Array.isArray(saved.party)) {
             return null;
+        }
+        // 日誌が入る前の 冒険の書も そのまま読めるように
+        if (!Array.isArray(saved.journal)) {
+            saved.journal = [];
+        }
+        if (saved.cleared && saved.flags) {
+            saved.flags.cleared = true;
         }
         return saved;
     }
@@ -507,7 +529,7 @@
 
     function loadNpcs() {
         const map = currentMap();
-        field.npcs = (map.npcs || []).filter(npc => !(npc.hideIf && game.flags[npc.hideIf])).map(npc => Object.assign({ hx: npc.x, hy: npc.y, cx: npc.x, cy: npc.y, timer: 1000 + rng() * 2000 }, npc));
+        field.npcs = (map.npcs || []).filter(npc => !(npc.hideIf && game.flags[npc.hideIf]) && !(npc.showIf && !game.flags[npc.showIf])).map(npc => Object.assign({ hx: npc.x, hy: npc.y, cx: npc.x, cy: npc.y, timer: 1000 + rng() * 2000 }, npc));
     }
 
     function npcAt(x, y) {
@@ -546,6 +568,9 @@
         field.grace = 4;
         const map = currentMap();
         if (map.kind === "town") {
+            if (!game.visited[mapId] || game.journal.length === 0) {
+                note(game.journal.length === 0 ? `${map.name}から 旅が はじまった。` : `${map.name}に たどりついた。`);
+            }
             game.visited[mapId] = true;
             game.lastTown = mapId;
         }
@@ -563,6 +588,11 @@
 
     async function exitToWorld() {
         const map = currentMap();
+        // 世界地図に 入口がない ダンジョン（星の遺跡）は 決まった場所へ 出る
+        if (map.exitTo) {
+            await warpTo(map.exitTo.map, map.exitTo.x, map.exitTo.y, "down");
+            return;
+        }
         const pos = placePosition(map.place);
         await warpTo("world", pos.x, pos.y, "down");
     }
@@ -843,6 +873,7 @@
         }
         game.flags[pedestal.flag] = true;
         R.addItem(game.bag, pedestal.item);
+        note(`${data.items[pedestal.item].name}を 手に入れた。`);
         audio.jingle("item");
         await sayAll(pedestal.text);
         saveGame();
@@ -867,9 +898,10 @@
         busy = true;
         await sayAll(boss.intro);
         closeMessage();
-        const result = await startBattle(boss.enemies, { boss: true });
+        const result = await startBattle(boss.enemies, { boss: true, music: boss.music });
         if (result === "win") {
             game.flags[boss.flag] = true;
+            note(`${data.enemies[boss.enemies[0]].name}を たおした！`);
             saveGame();
             await say("だいざの 上で なにかが 光っている。");
             closeMessage();
@@ -885,6 +917,15 @@
                 await say(arg);
             } else if (name === "flag") {
                 game.flags[arg] = true;
+            } else if (name === "ask") {
+                // 「いいえ」なら ここで やめる（失敗では ない）
+                if (!(await yesNo(arg))) {
+                    return true;
+                }
+            } else if (name === "warp") {
+                closeMessage();
+                await warpTo(arg, extra[0], extra[1], extra[2] || "up");
+                return true;
             } else if (name === "give") {
                 R.addItem(game.bag, arg);
                 await say(`${data.items[arg].name}を 手に入れた！`);
@@ -899,6 +940,7 @@
                 member.equip.weapon = arg === "mage" ? "kashinotsue" : "konbou";
                 member.equip.armor = arg === "mage" ? "tabibitonofuku" : "kawanoyoroi";
                 game.party.push(member);
+                note(`${extra}が 仲間に なった。（Lv ${level}）`);
                 audio.jingle("join");
                 loadNpcs();
             } else if (name === "heal") {
@@ -912,6 +954,7 @@
                 if (extra && extra.flag) {
                     game.flags[extra.flag] = true;
                 }
+                note(`${data.enemies[arg[arg.length - 1]].name}を たおした！`);
             } else if (name === "ending") {
                 await playEnding();
                 return true;
@@ -978,6 +1021,12 @@
         for (const [id, count] of Object.entries(groups)) {
             await battleLog(count > 1 ? `${data.enemies[id].name}が ${count}ひき あらわれた！` : `${data.enemies[id].name}が あらわれた！`);
         }
+        // ずっと強くなると、弱い魔物は おそれをなして にげていく
+        if (!options.boss && R.overwhelms(game.party, enemyIds) && rng() < 0.5) {
+            await battleLog("まものたちは おそれをなして にげだした！");
+            battle.over = true;
+            battle.result = "scared";
+        }
 
         let result = null;
         while (!battle.over) {
@@ -1001,6 +1050,9 @@
             game.gold += rewards.gold;
             game.stats.wins += 1;
             battle.defeated.forEach(id => {
+                if (!game.kills[id] && data.enemies[id].rare) {
+                    note(`はじめて ${data.enemies[id].name}を たおした！`);
+                }
                 game.kills[id] = (game.kills[id] || 0) + 1;
             });
             audio.jingle("victory");
@@ -1015,12 +1067,20 @@
                     .filter(([key]) => up.gains[key] > 0)
                     .map(([key, label]) => `${label}が ${up.gains[key]} あがった`);
                 await say(`${up.name}は レベル ${up.level}に あがった！\n${gains.join("、")}！`);
+                if (up.level % 5 === 0 || up.level === R.MAX_LEVEL) {
+                    const member = game.party.find(m => m.name === up.name);
+                    const stats = member ? `（HP ${R.maxHp(member)}・こうげき力 ${R.attackOf(member)}）` : "";
+                    note(`${up.name}が レベル ${up.level}に なった。${stats}`);
+                }
                 for (const spellId of up.learned) {
                     await say(`${up.name}は ${data.spells[spellId].name}を おぼえた！`);
+                    note(`${up.name}が ${data.spells[spellId].name}を おぼえた。`);
                 }
             }
         } else if (result === "empty") {
             await battleLog("まものは みんな にげてしまった。");
+            result = "win";
+        } else if (result === "scared") {
             result = "win";
         } else if (result === "flee") {
             await battleLog("うまく にげきれた！");
@@ -1094,7 +1154,13 @@
         });
     }
 
+    let testAutoBattle = false; // テスト用：命令を自動で決める
+
     async function chooseCommands(battle, status) {
+        if (testAutoBattle) {
+            await sleep(10);
+            return R.autoCommands(battle, game.bag);
+        }
         const commands = [];
         const members = game.party.map((m, i) => i);
         let k = 0;
@@ -1120,7 +1186,7 @@
                 { label: "ぼうぎょ", value: "defend" }
             ];
             if (k === 0) {
-                options.push({ label: battle.canFlee ? "にげる" : "にげる", value: "flee" });
+                options.push({ label: "にげる", value: "flee" });
                 options.push({ label: "おまかせ", value: "auto" });
             }
             const choice = await choose(options, { style: { left: "3%", bottom: "3%", minWidth: "38%" }, title: member.name, cols: 2, cancel: k > 0 });
@@ -1774,28 +1840,172 @@
         return `${Math.floor(minutes / 60)}じかん ${minutes % 60}ふん`;
     }
 
-    async function menuRecords() {
-        saveGame();
-        const kinds = Object.keys(data.enemies);
-        const seen = kinds.filter(id => game.seen[id]).length;
-        const el = makeWin("records", { left: "3%", top: "3%", right: "3%", bottom: "3%", overflow: "hidden" });
-        const lines = kinds.filter(id => game.seen[id]).map(id => `${data.enemies[id].name}　${game.kills[id] || 0}`);
-        el.innerHTML = `
-            <div>ぼうけんの きろく</div>
-            <div class="info">プレイじかん ${formatTime(game.stats.playMs)}／あるいた歩数 ${game.stats.steps}／たたかい ${game.stats.battles}（かち ${game.stats.wins}）／たからばこ ${game.stats.chests}</div>
-            <div>まもの ずかん（${seen}/${kinds.length}）　たおした数</div>
-            <div class="info" style="columns:2">${lines.map(escapeHtml).join("<br>") || "まだ 出会っていない"}</div>`;
-        await new Promise(resolve => {
+    // 決定・キャンセルで 閉じる 大きな ウィンドウ。onKey で 上下の 操作も うけとれる
+    function panel(style, render, onKey) {
+        const el = makeWin("records", Object.assign({ left: "3%", top: "3%", right: "3%", bottom: "3%", overflow: "hidden" }, style));
+        render(el);
+        return new Promise(resolve => {
             const pop = pushLayer({
                 onKey(action) {
                     if (action === "ok" || action === "cancel") {
+                        audio.se("cancel");
                         pop();
+                        el.remove();
                         resolve();
+                    } else if (onKey && onKey(action)) {
+                        audio.se("cursor");
+                        render(el);
                     }
                 }
             });
         });
-        el.remove();
+    }
+
+    async function menuRecords() {
+        saveGame();
+        while (true) {
+            const page = await choose([
+                { label: "ぼうけんの きろく", value: "stats" },
+                { label: "まもの ずかん", value: "book" },
+                { label: "ぼうけん にっし", value: "journal" }
+            ], { style: { left: "3%", top: "3%" }, title: "きろく" });
+            if (page === null) {
+                return;
+            }
+            if (page === "stats") {
+                await recordsStats();
+            } else if (page === "book") {
+                await monsterBook();
+            } else {
+                await journalView();
+            }
+        }
+    }
+
+    // ずかんに のる まもの（かげの王の しんのすがたは 出会うまで ひみつ）
+    function bookKinds() {
+        return Object.keys(data.enemies).filter(id => id !== "kagenoou2" || game.seen[id]);
+    }
+
+    function recordsStats() {
+        const kinds = bookKinds();
+        const seen = kinds.filter(id => game.seen[id]).length;
+        const kills = Object.values(game.kills).reduce((sum, n) => sum + n, 0);
+        const members = game.party.map(m => `${escapeHtml(m.name)}　Lv ${m.level}　HP ${R.maxHp(m)}　こうげき ${R.attackOf(m)}　しゅび ${R.defenseOf(m)}`);
+        return panel({}, el => {
+            el.innerHTML = `
+                <div>ぼうけんの きろく</div>
+                <div class="info">プレイじかん ${formatTime(game.stats.playMs)}<br>あるいた歩数 ${game.stats.steps}<br>たたかい ${game.stats.battles}かい（かち ${game.stats.wins}）<br>たおした まもの ${kills}ひき<br>たからばこ ${game.stats.chests}こ<br>まもの ずかん ${seen} / ${kinds.length}</div>
+                <div style="margin-top:0.4em">いまの つよさ</div>
+                <div class="info">${members.join("<br>")}</div>`;
+        });
+    }
+
+    // ずかんの せつめい（たおしたことが あると くわしく わかる）
+    function bookText(id) {
+        const enemy = data.enemies[id];
+        const kills = game.kills[id] || 0;
+        if (!kills) {
+            return `${enemy.name}\nたおした数 0\n\nたおすと くわしいことが わかる。`;
+        }
+        const notes = [];
+        const resist = enemy.resist || {};
+        const ELEMENT = { fire: "火", ice: "氷", thunder: "雷", light: "光", blast: "ばくはつ" };
+        Object.entries(resist).forEach(([element, rate]) => {
+            if (rate === 0) {
+                notes.push(`${ELEMENT[element]}が きかない`);
+            } else if (rate < 1) {
+                notes.push(`${ELEMENT[element]}に つよい`);
+            } else if (rate > 1) {
+                notes.push(`${ELEMENT[element]}に よわい`);
+            }
+        });
+        if (enemy.sleepImmune) {
+            notes.push("ねむらない");
+        }
+        if (enemy.rare) {
+            notes.push("すぐ にげる めずらしい まもの");
+        }
+        return `${enemy.name}\nたおした数 ${kills}\nHP ${enemy.hp}　こうげき ${enemy.atk}　まもり ${enemy.def}\nけいけんち ${enemy.exp}　ゴールド ${enemy.gold}${notes.length ? `\n${notes.join("・")}` : ""}`;
+    }
+
+    async function monsterBook() {
+        const kinds = bookKinds();
+        const info = makeWin("info book", { left: "3%", top: "3%", width: "50%", bottom: "3%", whiteSpace: "pre-wrap" });
+        const picture = document.createElement("canvas");
+        picture.width = 64;
+        picture.height = 64;
+        picture.style.cssText = "display:block;width:5em;height:5em;margin:0 auto 0.3em;image-rendering:pixelated";
+        const text = document.createElement("div");
+        info.append(picture, text);
+        const g2 = picture.getContext("2d");
+        g2.imageSmoothingEnabled = false;
+        let at = 0;
+        while (true) {
+            const index = await choose(kinds.map((id, i) => ({
+                label: game.seen[id] ? data.enemies[id].name : "？？？？",
+                value: id,
+                right: String(i + 1).padStart(2, "0")
+            })), {
+                style: { right: "3%", top: "3%", width: "42%" },
+                className: "book",
+                title: `ずかん ${kinds.filter(id => game.seen[id]).length}/${kinds.length}`,
+                maxRows: 9,
+                start: at,
+                returnIndex: true,
+                onMove: item => {
+                    g2.clearRect(0, 0, 64, 64);
+                    if (!game.seen[item.value]) {
+                        text.textContent = "まだ 出会っていない。";
+                        return;
+                    }
+                    const enemy = data.enemies[item.value];
+                    const sprite = S.monster(enemy.sprite, enemy.palette);
+                    const scale = Math.min(64 / sprite.width, 64 / sprite.height);
+                    const w = sprite.width * scale;
+                    const h = sprite.height * scale;
+                    g2.drawImage(sprite, (64 - w) / 2, 64 - h, w, h);
+                    text.textContent = bookText(item.value);
+                }
+            });
+            // 決定しても 閉じずに 見つづけられる。キャンセルで もどる
+            if (index === null) {
+                break;
+            }
+            at = index;
+        }
+        info.remove();
+    }
+
+    function journalView() {
+        const lines = game.journal.map(entry => `${formatClock(entry.t)}　${entry.text}`);
+        const visible = 8;
+        let first = Math.max(0, lines.length - visible); // さいしょは 新しい ほうを 見せる
+        return panel({}, el => {
+            const shown = lines.slice(first, first + visible);
+            el.innerHTML = `
+                <div>ぼうけん にっし${lines.length > visible ? `（${first + 1}〜${first + shown.length} / ${lines.length}）` : ""}</div>
+                <div class="info" style="white-space:pre-wrap">${shown.map(escapeHtml).join("\n") || "まだ なにも かかれていない。"}</div>
+                ${lines.length > visible ? '<div class="info" style="position:absolute;right:0.8em;bottom:0.3em">▲▼で めくる</div>' : ""}`;
+        }, action => {
+            const before = first;
+            if (action === "up") {
+                first = Math.max(0, first - 1);
+            } else if (action === "down") {
+                first = Math.max(0, Math.min(lines.length - visible, first + 1));
+            } else if (action === "left") {
+                first = Math.max(0, first - visible);
+            } else if (action === "right") {
+                first = Math.max(0, Math.min(lines.length - visible, first + visible));
+            }
+            return first !== before;
+        });
+    }
+
+    // 1:23 のような プレイ時間の 書き方（日誌の 左はし）
+    function formatClock(ms) {
+        const minutes = Math.floor(ms / 60000);
+        return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
     }
 
     async function menuSettings() {
@@ -1846,7 +2056,9 @@
     }
 
     async function giveTodoSeeds() {
-        const today = new Date().toISOString().slice(0, 10);
+        // 日付は その土地の暦で数える（toISOString だと 日本の朝 9 時まで 前の日になる）
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
         if (game.todo.day !== today) {
             game.todo.day = today;
             game.todo.today = 0;
@@ -2154,7 +2366,11 @@
     }
 
     async function playEnding() {
+        if (!game.cleared) {
+            note("空に 星を とりもどした！");
+        }
         game.cleared = true;
+        game.flags.cleared = true; // クリア後に 出てくる人の 目じるし
         saveGame();
         closeMessage();
         await fade(() => {
@@ -2223,6 +2439,19 @@
         },
         startBattle: (ids, options) => startBattle(ids, options || {}),
         warp: (mapId, x, y) => warpTo(mapId, x, y),
-        layers: () => layers.length
+        layers: () => layers.length,
+        passable: (x, y) => passable(x, y),
+        tileAt: (x, y) => tileAt(x, y),
+        moving: () => Boolean(field.moving),
+        setAutoBattle: on => {
+            testAutoBattle = Boolean(on);
+        },
+        setLevel: level => {
+            game.party = game.party.map(m => {
+                const fresh = R.createMember(m.cls, m.name, level, rng);
+                fresh.equip = m.equip;
+                return fresh;
+            });
+        }
     };
 })();

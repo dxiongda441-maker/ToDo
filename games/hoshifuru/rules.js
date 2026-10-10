@@ -243,6 +243,20 @@
         return group;
     }
 
+    // とても強くなった仲間には、弱い魔物が おそれをなす（強くなったことを 感じられるように）。
+    // 先頭の人の ふつうの攻撃で、どの魔物も 一撃で たおせるほど 差があるとき true
+    function overwhelms(party, enemyIds) {
+        const leader = party.find(member => member.hp > 0);
+        if (!leader || enemyIds.length === 0) {
+            return false;
+        }
+        const atk = attackOf(leader);
+        return enemyIds.every(id => {
+            const enemy = data.enemies[id];
+            return !enemy.boss && !enemy.rare && (atk / 2 - enemy.def / 4) * 0.875 >= enemy.hp * 1.5;
+        });
+    }
+
     // ---------- 戦闘 ----------
     const LETTERS = "ABCDEFGH";
 
@@ -847,6 +861,7 @@
         restoreMp,
         revive,
         rollEncounter,
+        overwhelms,
         createBattle,
         resolveRound,
         battleRewards,

@@ -13,12 +13,17 @@
 - 履歴カレンダー：日ごとに追加・削除したタスクを表示。削除したタスクは「Restore」で一覧に戻せる
 - 配色：Auto（端末の設定に合わせる）/ Light / Dark
 - バックアップ：Export で JSON ファイルに保存、Import で取り込み（同じタスクは二重にならない）
+- 集中タイマー（ポモドーロ）：タスクを選んで 15 / 25 / 50 分集中 → 休憩（4 回ごとに長め）。今日の回数・分とタスクごとの回数を記録。
+  動いている間はタブの題名に残り時間が出る。ページを閉じても、終わる時刻を覚えているので続きから数える
 
-## おまけ：盤上戦略ゲーム「うつろい」
+## おまけ：ゲーム
 
-`games/utsuroi/index.html` を開くと遊べます（ToDo 画面の一番下にもリンクがあります）。
-駒の動きを床の紋が決め、駒が離れるたびに床が変わる、オリジナルの 2 人用ゲームです。
-ルールと設計の説明は [`games/utsuroi/README.md`](games/utsuroi/README.md) にあります。
+`games/index.html`（ゲーム一覧。ToDo 画面の一番下にもリンクがあります）から遊べます。
+
+- **うつろい**（`games/utsuroi/`）：駒の動きを床の紋が決め、駒が離れるたびに床が変わる、オリジナルの 2 人用盤上ゲーム。
+  説明は [`games/utsuroi/README.md`](games/utsuroi/README.md)。
+- **ほしふるクエスト**（`games/hoshifuru/`）：レベルを上げて強くなる、ドット絵のロールプレイングゲーム。
+  ToDo で終えたタスクが、ゲームの中で能力を上げる「がんばりのたね」になる。説明は [`games/hoshifuru/README.md`](games/hoshifuru/README.md)。
 
 ## 保存データ
 
@@ -28,6 +33,7 @@
 | `todo.archive.v1` | 削除・一括削除したタスク（上の項目 ＋ `deletedAt`・`reason`） |
 | `todo.theme.v1` | 配色の設定（`auto` / `light` / `dark`） |
 | `todo.sort.v1` | 並び順（`added`＝自分で決めた順 / `due`＝期限日順）。自分で決めた順はタスク一覧の配列の順番そのもの |
+| `todo.focus.v1` | 集中タイマー（今のモード・終わる時刻・選んだタスク・日ごとの回数と分・タスクごとの回数） |
 
 ## ディレクトリ構成
 
@@ -41,14 +47,20 @@ ToDo/
 │   ├── browser-check.js     ブラウザで実際に操作して確かめる（Playwright がある環境だけ）
 │   ├── test-utsuroi.js      ゲームのルールと CPU のテスト
 │   ├── utsuroi-selfplay.js  ゲームの CPU 同士の対局で、ルールの釣り合いを調べる
-│   └── utsuroi-make-puzzles.js  ゲームの詰め問題を作る
+│   ├── utsuroi-make-puzzles.js  ゲームの詰め問題を作る
+│   ├── test-hoshifuru.js    RPG のマップ・データ・ルール・曲のテスト
+│   ├── hoshifuru-balance.js RPG の難しさを 自動プレイで調べる
+│   └── hoshifuru-playtest.js RPG を ブラウザで 最初から最後まで 通して遊ぶ（Playwright がある環境だけ）
 ├── games/
-│   └── utsuroi/      盤上戦略ゲーム「うつろい」（README.md に詳しい説明）
+│   ├── index.html    ゲーム一覧（進み具合も表示）
+│   ├── utsuroi/      盤上戦略ゲーム「うつろい」（README.md に詳しい説明）
+│   └── hoshifuru/    RPG「ほしふるクエスト」（README.md に詳しい説明）
 ├── .github/          自動チェックとプルリクエストのひな形
 ├── css/
 │   ├── base.css      色変数・背景・全体レイアウト・共通クラス
 │   ├── tasks.css     入力フォーム・フィルター・タスクリスト・集計
-│   └── history.css   履歴カレンダー・日別履歴リスト
+│   ├── history.css   履歴カレンダー・日別履歴リスト
+│   └── focus.css     集中タイマー
 └── js/
     ├── utils.js      日付フォーマット・ID 生成などのヘルパー
     ├── state.js      アプリ全体で共有する状態（タスク一覧・選択中の日付など）
@@ -58,6 +70,7 @@ ToDo/
     ├── tasks.js      タスクの追加・編集・削除・期限日・検索・フィルターと描画
     ├── history.js    履歴カレンダーと日別履歴の描画（削除したタスクの復元）
     ├── backup.js     JSON ファイルへの書き出し・取り込み
+    ├── focus.js      集中タイマー（ポモドーロ）
     └── main.js       起動処理（データ読み込み → イベント登録 → 初回描画）
 ```
 
@@ -74,6 +87,7 @@ ToDo/
 | 配色の切り替えを変える | `js/theme.js`（色そのものは各 CSS の `body.dark` ） |
 | 「元に戻す」のお知らせを変える | `js/toast.js` |
 | バックアップの書き出し・取り込みを変える | `js/backup.js` |
+| 集中タイマーを変える | `js/focus.js`・`css/focus.css` |
 | 画面の文言・要素を変える | `index.html` |
 
 ## JavaScript の仕組み

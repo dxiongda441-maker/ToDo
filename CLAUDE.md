@@ -34,6 +34,17 @@
   先手・後手の勝率や手数が極端になっていないか確かめ、`games/utsuroi/README.md` の表も直す。
 - 保存データのキー（`utsuroi.*.v1`）の形式を変えるときは、古い形式も読めるようにする。
 
+## RPG（games/hoshifuru）
+
+- 画面の文言は日本語。説明は `games/hoshifuru/README.md`。
+- `rules.js` はルールだけを持ち、DOM を触らない（Node のテストとバランス調べで使う）。数字は `data.js` にまとめる。
+- マップ・データを変えたら `tools/test-hoshifuru.js`（`check.sh` から動く）で、行き来できるか・参照が正しいかを確かめる。
+- 魔物・装備・経験値の数字を変えたら `node tools/hoshifuru-balance.js` を seed を変えて何回か動かし、README の表も直す。
+- 曲（`audio.js` の MML）は、くり返す曲のパートの長さをそろえる（テストで確かめている）。
+- 冒険の書（`hoshifuru.save.v1`）に項目を足すときは、`loadSave()` で古い冒険の書にも足す。
+- ToDo の保存データは **読むだけ**（がんばりのたね）。書きかえない。
+- 大きく変えたら `node tools/hoshifuru-playtest.js`（Playwright・20〜30 分）で最初から最後まで通るか確かめる。
+
 ## 作業の進め方
 
 - **作業の始めに `STATUS.md` を読み、終わりに更新する。** 別のセッションと作業状況を共有するため。

@@ -612,6 +612,8 @@
         steel: { 1: "#9aa5b1", 2: "#5e6873", 3: "#e3e8ee", e: "#ff4d4d", p: "#ffdd00", m: "#1b1b2f", a: "#c0392b", b: "#d0b060" },
         dark: { 1: "#41394f", 2: "#221d2a", 3: "#8a7aa8", e: "#ff4d4d", p: "#ffdd00", m: "#0b0812", a: "#8e44ad", b: "#c0c0d0" },
         pale: { 1: "#d8e4f0", 2: "#9fb3c8", 3: "#ffffff", e: "#203040", p: "#4fa3ff", m: "#203040", a: "#f1c232", b: "#fff" },
+        star: { 1: "#2a3a8a", 2: "#141d4d", 3: "#ffe066", e: "#fff", p: "#1b1b2f", m: "#0b1030", a: "#ffd34d", b: "#fff7c2" },
+        cosmic: { 1: "#6a3fb5", 2: "#33206b", 3: "#7df9ff", e: "#fff", p: "#ff4dd2", m: "#140b2e", a: "#7df9ff", b: "#e0b3ff" },
         "true": { 1: "#5d1f3a", 2: "#2e0d1d", 3: "#c0607e", e: "#ffdd00", p: "#ff2d2d", m: "#12040a", a: "#f1c232", b: "#c0c0d0" }
     };
 

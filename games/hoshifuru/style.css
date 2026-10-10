@@ -106,6 +106,12 @@ canvas {
     pointer-events: auto;
 }
 
+/* 全体を おおう ウィンドウは 後ろが すけないように */
+.win.records,
+.win.book {
+    background: rgba(0, 0, 0, 0.97);
+}
+
 .win-title {
     position: absolute;
     top: -0.8em;
