@@ -105,6 +105,17 @@ body.dark .games-link a {
     color: #93c5fd;
 }
 
+.seed-note {
+    margin: 0.4rem 0 0;
+    text-align: center;
+    font-size: 0.85rem;
+    color: #047857;
+}
+
+body.dark .seed-note {
+    color: #6ee7b7;
+}
+
 /* ---------- お知らせ（元に戻す） ---------- */
 .toast {
     position: fixed;

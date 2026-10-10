@@ -146,6 +146,13 @@ async function checkTodo(browser, width) {
     await page.click("#clear-completed");
     check(!(await texts(page)).includes("Write report"), "Clear completed");
     check((await page.textContent("#week-count")) === "1 done this week", "この 1 週間に 終えた 数が 出る（片づけた ものも 数える）");
+    check(await page.isHidden("#seed-note"), "RPG を 始めていなければ がんばりのたねの 知らせは 出ない");
+    await page.evaluate(() => {
+        localStorage.setItem("hoshifuru.save.v1", JSON.stringify({ todo: { redeemed: [] } }));
+        TodoApp.tasks.render();
+    });
+    check(/1 effort seed is waiting/.test(await page.textContent("#seed-note")), "RPG で 受け取れる がんばりのたねの 数が 出る");
+    await page.evaluate(() => localStorage.removeItem("hoshifuru.save.v1"));
     await page.click(".history-item:has-text('Write report') .history-restore");
     check((await texts(page)).includes("Write report"), "履歴から復元できる");
 

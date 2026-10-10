@@ -25,7 +25,7 @@
 - **うつろい**（`games/utsuroi/`）：駒の動きを床の紋が決め、駒が離れるたびに床が変わる、オリジナルの 2 人用盤上ゲーム。
   説明は [`games/utsuroi/README.md`](games/utsuroi/README.md)。
 - **ほしふるクエスト**（`games/hoshifuru/`）：レベルを上げて強くなる、ドット絵のロールプレイングゲーム。
-  ToDo で終えたタスクと集中タイマーの集中が、ゲームの中で能力を上げる「がんばりのたね」になる。説明は [`games/hoshifuru/README.md`](games/hoshifuru/README.md)。
+  ToDo で終えたタスクと集中タイマーの集中が、ゲームの中で能力を上げる「がんばりのたね」になる（受け取れる数は ToDo 画面の一番下にも出る）。説明は [`games/hoshifuru/README.md`](games/hoshifuru/README.md)。
 
 ## 保存データ
 
@@ -74,6 +74,7 @@ ToDo/
     ├── history.js    履歴カレンダーと日別履歴の描画（削除したタスクの復元）
     ├── backup.js     JSON ファイルへの書き出し・取り込み
     ├── focus.js      集中タイマー（ポモドーロ）
+    ├── games-link.js ほしふるクエストで受け取れる「がんばりのたね」の数を一番下に出す（RPG を始めたときだけ）
     └── main.js       起動処理（データ読み込み → イベント登録 → 初回描画）
 ```
 

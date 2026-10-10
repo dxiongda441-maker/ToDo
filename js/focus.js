@@ -147,6 +147,9 @@ TodoApp.focus = (() => {
         pruneDays();
         save();
         render();
+        if (TodoApp.gamesLink) {
+            TodoApp.gamesLink.refresh(); // 集中した 回数も がんばりのたねに なる
+        }
     }
 
     // 古い日の記録は 60 日ぶんだけ残す

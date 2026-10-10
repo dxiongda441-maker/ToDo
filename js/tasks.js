@@ -485,6 +485,9 @@ TodoApp.tasks = (() => {
         if (TodoApp.backup) {
             TodoApp.backup.refresh();
         }
+        if (TodoApp.gamesLink) {
+            TodoApp.gamesLink.refresh();
+        }
     }
 
     function updateSummary() {
