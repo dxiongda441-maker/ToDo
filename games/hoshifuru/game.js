@@ -2182,7 +2182,8 @@
             const page = await choose([
                 { label: "ぼうけんの きろく", value: "stats" },
                 { label: "まもの ずかん", value: "book" },
-                { label: "ぼうけん にっし", value: "journal" }
+                { label: "ぼうけん にっし", value: "journal" },
+                { label: "しょうごう", value: "titles" }
             ], { style: { left: "3%", top: "3%" }, title: "きろく" });
             if (page === null) {
                 return;
@@ -2191,6 +2192,8 @@
                 await recordsStats();
             } else if (page === "book") {
                 await monsterBook();
+            } else if (page === "titles") {
+                await titlesView();
             } else {
                 await journalView();
             }
@@ -2309,6 +2312,46 @@
                 el.querySelector(".info").textContent = `■ いまいる ところ（${currentMap().name}）　□ つぎの もくてき\n${goal.text}`;
                 el.querySelector(".info").style.whiteSpace = "pre-wrap";
             }
+        });
+    }
+
+    // しょうごう（実績）。冒険の書の 中身から その場で 決める（保存は しない）
+    const TITLES = [
+        { name: "はじめの いっぽ", hint: "まものを 1 ぴき たおす", ok: g => g.stats.wins >= 1 },
+        { name: "いっぱしの ぼうけんしゃ", hint: "レベル 10 に なる", ok: g => g.party[0].level >= 10 },
+        { name: "ベテラン", hint: "レベル 20 に なる", ok: g => g.party[0].level >= 20 },
+        { name: "でんせつの ゆうしゃ", hint: "レベル 30 に なる", ok: g => g.party[0].level >= 30 },
+        { name: "なかまと ともに", hint: "なかまが 2 人 そろう", ok: g => g.party.length >= 3 },
+        { name: "星を とりもどした もの", hint: "かげの王を たおす", ok: g => Boolean(g.cleared) },
+        { name: "ほしくいを こえし もの", hint: "星の遺跡の おくへ", ok: g => Boolean(g.flags.bossStar) },
+        { name: "とうぎじょうの ほし", hint: "とうぎじょうの さいごの ランクで ゆうしょう", ok: g => Boolean(g.flags.arena4) },
+        { name: "まもの はかせ", hint: "ずかんを 半分 うめる", ok: g => Object.keys(g.seen).length * 2 >= Object.keys(data.enemies).length },
+        { name: "まもの マスター", hint: "ずかんを ぜんぶ うめる", ok: g => Object.keys(g.seen).length >= Object.keys(data.enemies).length },
+        { name: "ぴかりん ハンター", hint: "めずらしい まものを たおす", ok: g => (g.kills.pikarin || 0) >= 1 },
+        { name: "たからさがしの たつじん", hint: "たからばこを 20 こ あける", ok: g => g.stats.chests >= 20 },
+        { name: "あるきつづける もの", hint: "5000 歩 あるく", ok: g => g.stats.steps >= 5000 },
+        { name: "こつこつ がんばる ひと", hint: "がんばりのたねを 10 こ うけとる", ok: g => g.todo.redeemed.length >= 10 },
+        { name: "がんばりの たいじゅ", hint: "がんばりの木を たいじゅに そだてる", ok: g => g.todo.redeemed.length >= data.effortTree[data.effortTree.length - 1].count }
+    ];
+
+    function titlesView() {
+        const got = TITLES.filter(title => title.ok(game)).length;
+        const lines = TITLES.map(title => (title.ok(game) ? `★ ${title.name}` : `・？？？（${title.hint}）`));
+        const visible = 9;
+        let first = 0;
+        return panel({}, el => {
+            el.innerHTML = `
+                <div>しょうごう ${got} / ${TITLES.length}</div>
+                <div class="info" style="white-space:pre-wrap">${lines.slice(first, first + visible).map(escapeHtml).join("\n")}</div>
+                ${lines.length > visible ? '<div class="info" style="position:absolute;right:0.8em;bottom:0.3em">▲▼で めくる</div>' : ""}`;
+        }, action => {
+            const before = first;
+            if (action === "up") {
+                first = Math.max(0, first - 1);
+            } else if (action === "down") {
+                first = Math.max(0, Math.min(lines.length - visible, first + 1));
+            }
+            return first !== before;
         });
     }
 
