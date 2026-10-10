@@ -24,6 +24,8 @@ try {
 const root = path.join(__dirname, "..");
 const todoUrl = `file://${path.join(root, "index.html")}`;
 const gameUrl = `file://${path.join(root, "games", "utsuroi", "index.html")}`;
+const hubUrl = `file://${path.join(root, "games", "index.html")}`;
+const rpgUrl = `file://${path.join(root, "games", "hoshifuru", "index.html")}`;
 
 let failed = 0;
 function check(condition, label) {
@@ -63,7 +65,7 @@ async function checkAccessibility(page, label) {
     await page.addScriptTag({ path: axePath });
     const violations = await page.evaluate(async () => {
         const result = await window.axe.run(document, { resultTypes: ["violations"] });
-        return result.violations.map(v => `${v.id}（${v.nodes.length} か所）: ${v.help}`);
+        return result.violations.map(v => `${v.id}（${v.nodes.length} か所: ${v.nodes.slice(0, 3).map(n => n.target.join(" ")).join(", ")}）: ${v.help}`);
     });
     check(violations.length === 0, `アクセシビリティ（axe）: ${label} ${violations.join(" / ")}`);
 }
@@ -167,6 +169,20 @@ async function checkTodo(browser, width) {
     await page.click("#prev-month");
     check((await page.textContent("#month-label")) !== monthBefore, "カレンダーの月を切り替えられる");
 
+    // 集中タイマー：タスクを選んで動かし、時間が来たら（ここでは 終わる時刻を 過去にして 読み直す）記録される
+    await page.selectOption("#focus-task", { label: "Buy oat milk" });
+    await page.click("#focus-start");
+    await page.waitForTimeout(1200);
+    check((await page.textContent("#focus-start")) === "Pause" && (await page.textContent("#focus-clock")) < "25:00", "集中タイマーが動く");
+    await page.evaluate(() => {
+        const saved = JSON.parse(localStorage.getItem("todo.focus.v1"));
+        saved.endsAt = Date.now() - 1000;
+        localStorage.setItem("todo.focus.v1", JSON.stringify(saved));
+    });
+    await page.reload();
+    const focusStats = await page.textContent("#focus-stats");
+    check(/1 session · 25 min · this task: 1/.test(focusStats) && (await page.textContent("#focus-mode")) === "Short break", `時間が来ると 記録して 休憩になる（${focusStats}）`);
+
     await page.click("#theme-toggle");
     await page.click("#theme-toggle");
     check(await page.evaluate(() => document.body.classList.contains("dark")), "ダーク配色に切り替えられる");
@@ -215,6 +231,39 @@ async function checkGame(browser, width) {
     await page.close();
 }
 
+async function checkHubAndRpg(browser, width) {
+    console.log(`[ゲーム一覧・ほしふるクエスト・幅 ${width}px]`);
+    const { page, errors } = await newPage(browser, { width, height: 900 });
+    await page.route("https://fonts.googleapis.com/**", route => route.abort());
+    await page.route("https://fonts.gstatic.com/**", route => route.abort());
+    await page.goto(hubUrl);
+    await page.evaluate(() => {
+        localStorage.clear();
+        localStorage.setItem("todo.tasks.v1", JSON.stringify([{ id: "hub-1", text: "Done", completed: true, createdAt: 1700000000000 }]));
+        localStorage.setItem("utsuroi.record.v1", JSON.stringify({ easy: { win: 2, loss: 1, draw: 0 } }));
+    });
+    await page.reload();
+    check((await page.$$(".card .play")).length === 2, "ゲーム一覧に 2 つのゲームがある");
+    check((await page.textContent("#utsuroi-progress")).includes("2 勝 1 敗"), "うつろいの戦績が出る");
+    check((await page.textContent("#seeds")).includes("1 件"), "がんばりのたねに なる タスクの数が出る");
+    let scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    check(scrollWidth <= width, `ゲーム一覧が 横にはみ出さない（${scrollWidth}px）`);
+    await checkAccessibility(page, "ゲーム一覧");
+
+    await page.click(".card:has(#hoshifuru-title) .play");
+    await page.waitForFunction(() => window.HF && window.HF.debug && document.querySelector(".menu-item"));
+    check((await page.textContent(".menu-win")).includes("はじめから"), "ほしふるクエストの タイトル画面が出る");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(".name-input");
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => HF.debug.game && HF.debug.game.map === "sora");
+    check(true, "名前を決めて 冒険を始められる");
+    scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    check(scrollWidth <= width, `ほしふるクエストが 横にはみ出さない（${scrollWidth}px）`);
+    check(errors.length === 0, `JavaScript のエラーなし ${errors.join(" / ")}`);
+    await page.close();
+}
+
 (async () => {
     if (!axePath) {
         console.log("（axe-core が見つからないため、アクセシビリティの自動チェックは飛ばします）");
@@ -224,6 +273,7 @@ async function checkGame(browser, width) {
         for (const width of [375, 1024]) {
             await checkTodo(browser, width);
             await checkGame(browser, width);
+            await checkHubAndRpg(browser, width);
         }
     } finally {
         await browser.close();

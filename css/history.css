@@ -303,12 +303,14 @@ body.dark .month-button {
 
 /* スマホ幅では「5 items」の文字の代わりに点で示す（件数は読み上げ用ラベルにある） */
 @media (max-width: 600px) {
-    .calendar-day .day-events {
+    .calendar-day .day-events,
+    body.dark .calendar-day .day-events {
         font-size: 0;
         width: 6px;
         height: 6px;
         border-radius: 50%;
         background: var(--accent);
+        color: #fff; /* 文字は大きさ 0 で見えないが、読み上げ用に残す。点の色との組み合わせで コントラストを満たす */
     }
 }
 

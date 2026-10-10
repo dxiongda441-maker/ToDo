@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/tasks.css">
     <link rel="stylesheet" href="css/history.css">
+    <link rel="stylesheet" href="css/focus.css">
 </head>
 <body>
     <main class="app">
@@ -52,6 +53,30 @@
             <div class="progress" aria-hidden="true"><div id="progress-bar" class="progress-bar"></div></div>
         </footer>
 
+        <section id="focus-section" class="focus-section" aria-labelledby="focus-title" data-mode="focus">
+            <div id="focus-ring" class="focus-ring" aria-hidden="true"></div>
+            <div class="focus-body">
+                <h2 id="focus-title">Focus Timer</h2>
+                <p class="focus-time"><span id="focus-mode" class="focus-mode">Focus</span> <span id="focus-clock" class="focus-clock" role="timer" aria-live="off">25:00</span></p>
+                <div class="focus-actions">
+                    <button type="button" id="focus-start" class="focus-button primary" aria-pressed="false">Start</button>
+                    <button type="button" id="focus-reset" class="focus-button">Reset</button>
+                    <button type="button" id="focus-skip" class="focus-button" title="Skip to the next focus or break">Skip</button>
+                </div>
+                <div class="focus-options">
+                    <label for="focus-task">Task</label>
+                    <select id="focus-task" class="focus-select"></select>
+                    <label for="focus-length">Length</label>
+                    <select id="focus-length" class="focus-select">
+                        <option value="15">15 min</option>
+                        <option value="25">25 min</option>
+                        <option value="50">50 min</option>
+                    </select>
+                </div>
+                <p id="focus-stats" class="focus-stats" aria-live="polite"></p>
+            </div>
+        </section>
+
         <section class="history-section" aria-label="Task history">
             <header class="history-header">
                 <h2>Task History</h2>
@@ -81,7 +106,7 @@
             </div>
         </section>
 
-        <p class="games-link"><a href="games/utsuroi/index.html">Take a break: play UTSUROI, a strategy board game →</a></p>
+        <p class="games-link"><a href="games/index.html">Take a break: play a game (strategy board game or RPG) →</a></p>
     </main>
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden>
@@ -120,6 +145,7 @@
     <script src="js/tasks.js" defer></script>
     <script src="js/history.js" defer></script>
     <script src="js/backup.js" defer></script>
+    <script src="js/focus.js" defer></script>
     <script src="js/main.js" defer></script>
 </body>
 </html>

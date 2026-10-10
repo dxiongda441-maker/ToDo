@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ゲーム</title>
+    <meta name="description" content="ToDo のあいまに ひと休み。盤上戦略ゲーム「うつろい」と RPG「ほしふるクエスト」。">
+    <style>
+        /* ゲーム一覧：このページだけで使うので、ここに直接書く */
+        :root {
+            color-scheme: light dark;
+            --bg: #eef1f8;
+            --card: #ffffff;
+            --text: #1d2233;
+            --muted: #5b6380;
+            --line: #d5dbea;
+            --accent: #2f5bd3;
+            --chip: #e6ecfb;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f1222;
+                --card: #1a1f36;
+                --text: #e8ebf7;
+                --muted: #a3abc9;
+                --line: #2e3558;
+                --accent: #8fb2ff;
+                --chip: #252c4d;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Meiryo", system-ui, sans-serif;
+            line-height: 1.6;
+        }
+
+        main {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 24px 16px 40px;
+        }
+
+        h1 {
+            margin: 0 0 4px;
+            font-size: 1.6rem;
+        }
+
+        .lead {
+            margin: 0 0 20px;
+            color: var(--muted);
+        }
+
+        .cards {
+            display: grid;
+            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        }
+
+        .card {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 18px;
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+        }
+
+        .card h2 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        .kind {
+            align-self: flex-start;
+            padding: 1px 10px;
+            border-radius: 999px;
+            background: var(--chip);
+            color: var(--muted);
+            font-size: 0.8rem;
+        }
+
+        .card p {
+            margin: 0;
+        }
+
+        .progress {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .play {
+            margin-top: auto;
+            align-self: flex-start;
+            padding: 8px 18px;
+            border-radius: 10px;
+            background: var(--accent);
+            color: var(--card);
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .play:focus-visible {
+            outline: 3px solid var(--text);
+            outline-offset: 2px;
+        }
+
+        .seeds {
+            margin-top: 20px;
+            padding: 14px 18px;
+            border: 1px dashed var(--line);
+            border-radius: 14px;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .back {
+            margin-top: 24px;
+            text-align: center;
+        }
+
+        .back a {
+            color: var(--accent);
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>ゲーム</h1>
+        <p class="lead">ToDo のあいまに ひと休み。どちらも このブラウザの中だけで動き、記録も ここに 残ります。</p>
+
+        <div class="cards">
+            <section class="card" aria-labelledby="hoshifuru-title">
+                <span class="kind">RPG ・ ひとりで</span>
+                <h2 id="hoshifuru-title">ほしふるクエスト</h2>
+                <p>星をうばわれた世界で、3 つの「ほしのしずく」を集める旅。魔物と戦ってレベルを上げ、仲間と一緒に強くなる。</p>
+                <ul class="progress" id="hoshifuru-progress"><li>まだ 旅を始めていません。</li></ul>
+                <a class="play" href="hoshifuru/index.html">あそぶ</a>
+            </section>
+
+            <section class="card" aria-labelledby="utsuroi-title">
+                <span class="kind">盤上戦略 ・ CPU / 2 人</span>
+                <h2 id="utsuroi-title">うつろい</h2>
+                <p>駒の動きは 足もとの床が決め、床は 駒が離れるたびに 移ろう。運の要素がない オリジナルの盤上ゲーム。CPU は 4 段階。詰め問題 50 問つき。</p>
+                <ul class="progress" id="utsuroi-progress"><li>まだ 対局していません。</li></ul>
+                <a class="play" href="utsuroi/index.html">あそぶ</a>
+            </section>
+        </div>
+
+        <p class="seeds" id="seeds">
+            ToDo で 終えたタスクは、ほしふるクエストの どうぐ「がんばりのたね」に なります（1 日 5 個まで。村に入ると 受け取れます）。
+        </p>
+
+        <p class="back"><a href="../index.html">← ToDo アプリに戻る</a></p>
+    </main>
+
+    <script>
+        // 各ゲームの保存データから、進み具合を 少しだけ 見せる（読むだけで 書きかえない）
+        (() => {
+            "use strict";
+
+            function read(key, fallback) {
+                try {
+                    const text = localStorage.getItem(key);
+                    return text ? JSON.parse(text) : fallback;
+                } catch (_error) {
+                    return fallback;
+                }
+            }
+
+            function show(id, lines) {
+                const list = document.getElementById(id);
+                if (lines.length === 0) {
+                    return;
+                }
+                list.replaceChildren(...lines.map(text => {
+                    const item = document.createElement("li");
+                    item.textContent = text;
+                    return item;
+                }));
+            }
+
+            const save = read("hoshifuru.save.v1", null);
+            if (save && Array.isArray(save.party) && save.party[0]) {
+                const flags = save.flags || {};
+                const drops = ["shizuku1", "shizuku2", "shizuku3"].filter(flag => flags[flag]).length;
+                const minutes = Math.floor(((save.stats && save.stats.playMs) || 0) / 60000);
+                const hero = save.party[0];
+                show("hoshifuru-progress", [
+                    `${hero.name} Lv ${hero.level}${save.party.length > 1 ? `（仲間 ${save.party.length - 1} 人）` : ""}`,
+                    save.cleared ? "かげの王を たおした！（クリア済み）" : `ほしのしずく ${drops} / 3`,
+                    `プレイ時間 ${Math.floor(minutes / 60)} 時間 ${minutes % 60} 分`
+                ]);
+            }
+
+            const record = read("utsuroi.record.v1", {});
+            const totals = { win: 0, loss: 0, draw: 0 };
+            Object.values(record && typeof record === "object" ? record : {}).forEach(r => {
+                if (r && typeof r === "object") {
+                    totals.win += Number(r.win) || 0;
+                    totals.loss += Number(r.loss) || 0;
+                    totals.draw += Number(r.draw) || 0;
+                }
+            });
+            const solved = Object.keys(read("utsuroi.puzzles.v1", {}) || {}).length;
+            const lines = [];
+            if (totals.win + totals.loss + totals.draw > 0) {
+                lines.push(`CPU との対局 ${totals.win} 勝 ${totals.loss} 敗 ${totals.draw} 分`);
+            }
+            if (solved > 0) {
+                lines.push(`詰め問題 ${solved} 問 クリア`);
+            }
+            show("utsuroi-progress", lines);
+
+            // まだ たねに なっていない 終わったタスクの数
+            const tasks = read("todo.tasks.v1", []);
+            const archive = read("todo.archive.v1", []);
+            const done = new Set();
+            (Array.isArray(tasks) ? tasks : []).forEach(task => task && task.completed && done.add(task.id));
+            (Array.isArray(archive) ? archive : []).forEach(item => item && (item.completed || item.reason === "cleared") && done.add(item.id));
+            const redeemed = new Set(save && save.todo && Array.isArray(save.todo.redeemed) ? save.todo.redeemed : []);
+            const waiting = Array.from(done).filter(id => !redeemed.has(id)).length;
+            if (waiting > 0) {
+                const note = document.createElement("strong");
+                note.textContent = ` いま たねに なるのを まっている タスク：${waiting} 件`;
+                document.getElementById("seeds").append(note);
+            }
+        })();
+    </script>
+</body>
+</html>
