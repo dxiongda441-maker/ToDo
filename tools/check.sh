@@ -31,5 +31,21 @@ order=$(grep -o 'src="js/[^"]*"' index.html | sed 's/src="js\/\(.*\)\.js"/\1/' |
 expected="utils state storage theme toast tasks history backup main "
 [ "$order" = "$expected" ] && ok "$order" || ng "順番が「$order」になっている（「$expected」のはず）"
 
+echo "[ゲーム（games/utsuroi）のファイルと文法]"
+for f in $(grep -o '\(href\|src\)="[^"#:]*\.\(css\|js\)"' games/utsuroi/index.html | sed 's/.*="\(.*\)"/\1/'); do
+  [ -f "games/utsuroi/$f" ] && ok "games/utsuroi/$f" || ng "games/utsuroi/$f が無い"
+done
+for f in games/utsuroi/*.js tools/*.js; do
+  node --check "$f" 2>/dev/null && ok "$f" || ng "$f に文法エラーがある"
+done
+
+echo "[ゲームのルールと CPU のテスト]"
+if test_output=$(node tools/test-utsuroi.js 2>&1); then
+  ok "node tools/test-utsuroi.js"
+else
+  echo "$test_output"
+  ng "ゲームのテストが失敗した（node tools/test-utsuroi.js で詳細）"
+fi
+
 echo
 if [ "$FAIL" -eq 0 ]; then echo "すべて OK"; else echo "NG があります"; exit 1; fi

@@ -90,6 +90,21 @@ body.dark .theme-toggle {
     border-color: var(--border-dark);
 }
 
+/* ---------- ゲームへのリンク ---------- */
+.games-link {
+    margin: 1.5rem 0 0;
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+.games-link a {
+    color: var(--accent-hover);
+}
+
+body.dark .games-link a {
+    color: #93c5fd;
+}
+
 /* ---------- お知らせ（元に戻す） ---------- */
 .toast {
     position: fixed;
