@@ -21,7 +21,9 @@ TodoApp.backup = (() => {
             version: BACKUP_VERSION,
             exportedAt: new Date().toISOString(),
             tasks: state.tasks,
-            archive: state.archivedTasks
+            archive: state.archivedTasks,
+            // 集中タイマーの記録（無くても 取り込める）
+            focus: TodoApp.focus ? TodoApp.focus.exportData() : undefined
         };
     }
 
@@ -75,7 +77,8 @@ TodoApp.backup = (() => {
         });
 
         state.archivedTasks.sort((a, b) => b.deletedAt - a.deletedAt);
-        return { addedTasks, addedHistory };
+        const addedFocusDays = data && data.focus && TodoApp.focus ? TodoApp.focus.mergeData(data.focus) : 0;
+        return { addedTasks, addedHistory, addedFocusDays };
     }
 
     function importFromText(text) {
@@ -97,11 +100,12 @@ TodoApp.backup = (() => {
         const reader = new FileReader();
         reader.addEventListener("load", () => {
             try {
-                const { addedTasks, addedHistory } = importFromText(String(reader.result));
-                if (addedTasks === 0 && addedHistory === 0) {
+                const { addedTasks, addedHistory, addedFocusDays } = importFromText(String(reader.result));
+                if (addedTasks === 0 && addedHistory === 0 && addedFocusDays === 0) {
                     toast.show("Nothing new to import. Everything in the file is already here.");
                 } else {
-                    toast.show(`Imported ${addedTasks} tasks and ${addedHistory} history items`);
+                    const focusNote = addedFocusDays > 0 ? ` and focus records for ${addedFocusDays} ${addedFocusDays === 1 ? "day" : "days"}` : "";
+                    toast.show(`Imported ${addedTasks} tasks and ${addedHistory} history items${focusNote}`);
                 }
             } catch (error) {
                 console.warn("Failed to import backup", error);

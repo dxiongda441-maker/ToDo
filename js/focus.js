@@ -320,5 +320,49 @@ TodoApp.focus = (() => {
         render();
     }
 
-    return { init, formatClock };
+    // バックアップ用：記録（日ごと・タスクごと）だけを書き出す。動いているタイマーの状態は含めない
+    function exportData() {
+        const current = focus || load();
+        return { days: current.days, perTask: current.perTask };
+    }
+
+    // バックアップの取り込み：日ごと・タスクごとの回数は 多い方を残す。足した日の数を返す
+    function mergeData(incoming) {
+        if (!incoming || typeof incoming !== "object") {
+            return 0;
+        }
+        if (!focus) {
+            focus = load();
+        }
+        let addedDays = 0;
+        Object.entries(incoming.days && typeof incoming.days === "object" ? incoming.days : {}).forEach(([key, day]) => {
+            const sessions = Number(day && day.sessions) || 0;
+            const minutes = Number(day && day.minutes) || 0;
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || sessions <= 0) {
+                return;
+            }
+            const mine = focus.days[key];
+            if (!mine) {
+                addedDays += 1;
+            }
+            focus.days[key] = {
+                sessions: Math.max(sessions, mine ? mine.sessions : 0),
+                minutes: Math.max(minutes, mine ? mine.minutes : 0)
+            };
+        });
+        Object.entries(incoming.perTask && typeof incoming.perTask === "object" ? incoming.perTask : {}).forEach(([id, count]) => {
+            const n = Number(count) || 0;
+            if (n > 0) {
+                focus.perTask[id] = Math.max(n, focus.perTask[id] || 0);
+            }
+        });
+        pruneDays();
+        save();
+        if (els.section) {
+            render();
+        }
+        return addedDays;
+    }
+
+    return { init, formatClock, exportData, mergeData };
 })();

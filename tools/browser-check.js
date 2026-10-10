@@ -150,7 +150,8 @@ async function checkTodo(browser, width) {
             { id: archivedId, text: "Deleted on this device", completed: false, createdAt: 1700000000000 },
             { id: "check-bad-date", text: "Bad date", completed: false, createdAt: 1e100 }
         ],
-        archive: []
+        archive: [],
+        focus: { days: { "2026-01-05": { sessions: 3, minutes: 75 } }, perTask: {} }
     }));
     await page.setInputFiles("#import-file", trickyPath);
     await page.waitForFunction(() => Array.from(document.querySelectorAll(".task-text")).some(el => el.textContent === "Bad date"));
@@ -158,6 +159,7 @@ async function checkTodo(browser, width) {
     const afterTricky = await texts(page);
     check(!afterTricky.includes("Deleted on this device"), "削除したタスクは取り込みで復活しない");
     check(afterTricky.includes("Bad date"), "範囲外の日時を取り込んでも表示が壊れない");
+    check(await page.evaluate(() => JSON.parse(localStorage.getItem("todo.focus.v1")).days["2026-01-05"].sessions === 3), "バックアップから 集中タイマーの記録も 取り込める");
     await page.evaluate(() => {
         TodoApp.state.tasks = TodoApp.state.tasks.filter(task => task.id !== "check-bad-date");
         TodoApp.storage.saveTasks();
