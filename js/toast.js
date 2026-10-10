@@ -54,8 +54,22 @@ TodoApp.toast = (() => {
         });
 
         document.addEventListener("keydown", event => {
-            if (event.key === "Escape" && !toastEl.hidden) {
+            if (toastEl.hidden) {
+                return;
+            }
+            if (event.key === "Escape") {
                 hide();
+                return;
+            }
+            // Ctrl+Z（Mac は ⌘Z）でも「Undo」を押したことにする。文字入力中は入力欄の取り消しを優先する
+            const isUndoKey = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z";
+            const target = event.target;
+            const textInput = target && target.tagName === "INPUT"
+                && !["checkbox", "radio", "button", "submit", "reset"].includes(target.type);
+            const typing = Boolean(target) && (textInput || target.tagName === "TEXTAREA" || target.isContentEditable);
+            if (isUndoKey && currentAction && !typing) {
+                event.preventDefault();
+                actionButton.click();
             }
         });
     }

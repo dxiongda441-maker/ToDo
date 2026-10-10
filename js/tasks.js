@@ -11,6 +11,8 @@ TodoApp.tasks = (() => {
     const input = document.querySelector("#task-input");
     const dueInput = document.querySelector("#due-input");
     const searchInput = document.querySelector("#search-input");
+    const sortSelect = document.querySelector("#sort-select");
+    const overdueCountEl = document.querySelector("#overdue-count");
     const list = document.querySelector("#task-list");
     const template = document.querySelector("#task-template");
     const taskCountEl = document.querySelector("#task-count");
@@ -19,6 +21,9 @@ TodoApp.tasks = (() => {
     const emptyStateEl = document.querySelector("#empty-state");
     const clearCompletedButton = document.querySelector("#clear-completed");
     const filterButtons = Array.from(document.querySelectorAll(".filter-button"));
+
+    const SORT_STORAGE_KEY = "todo.sort.v1";
+    const SORT_MODES = ["added", "due"];
 
     const EMPTY_TEXT = {
         none: "No tasks yet. Add your first one above!",
@@ -71,10 +76,31 @@ TodoApp.tasks = (() => {
         state.archivedTasks = [record, ...state.archivedTasks.filter(item => item.id !== record.id)];
     }
 
+    // 期限日順：期限のあるものを日付の早い順に、期限のないものはその後ろに今の順番のまま並べる
+    function sortTasks(list) {
+        if (state.sortMode !== "due") {
+            return list;
+        }
+        return list
+            .map((task, index) => ({ task, index }))
+            .sort((a, b) => {
+                const dueA = a.task.dueDate || "";
+                const dueB = b.task.dueDate || "";
+                if (dueA && dueB && dueA !== dueB) {
+                    return dueA < dueB ? -1 : 1;
+                }
+                if (Boolean(dueA) !== Boolean(dueB)) {
+                    return dueA ? -1 : 1;
+                }
+                return a.index - b.index;
+            })
+            .map(entry => entry.task);
+    }
+
     function getFilteredTasks() {
         const query = state.searchQuery.trim().toLowerCase();
 
-        return state.tasks.filter(task => {
+        return sortTasks(state.tasks.filter(task => {
             if (state.activeFilter === "active" && task.completed) {
                 return false;
             }
@@ -82,7 +108,7 @@ TodoApp.tasks = (() => {
                 return false;
             }
             return !query || task.text.toLowerCase().includes(query);
-        });
+        }));
     }
 
     function getEmptyText() {
@@ -283,6 +309,13 @@ TodoApp.tasks = (() => {
 
         taskCountEl.textContent = `${total} ${totalLabel}`;
         completedCountEl.textContent = `${completed} ${completedLabel}`;
+
+        if (overdueCountEl) {
+            const todayKey = toDateKey(Date.now());
+            const overdue = state.tasks.filter(task => !task.completed && task.dueDate && task.dueDate < todayKey).length;
+            overdueCountEl.hidden = overdue === 0;
+            overdueCountEl.textContent = `${overdue} overdue`;
+        }
 
         if (progressBar) {
             const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
@@ -510,6 +543,25 @@ TodoApp.tasks = (() => {
         if (searchInput) {
             searchInput.addEventListener("input", () => {
                 state.searchQuery = searchInput.value;
+                renderTasks();
+            });
+        }
+
+        if (sortSelect) {
+            try {
+                const saved = localStorage.getItem(SORT_STORAGE_KEY);
+                state.sortMode = SORT_MODES.includes(saved) ? saved : "added";
+            } catch (_error) {
+                state.sortMode = "added";
+            }
+            sortSelect.value = state.sortMode;
+            sortSelect.addEventListener("change", () => {
+                state.sortMode = SORT_MODES.includes(sortSelect.value) ? sortSelect.value : "added";
+                try {
+                    localStorage.setItem(SORT_STORAGE_KEY, state.sortMode);
+                } catch (error) {
+                    console.warn("Failed to save sort mode", error);
+                }
                 renderTasks();
             });
         }

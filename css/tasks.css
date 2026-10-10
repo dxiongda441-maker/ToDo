@@ -101,6 +101,30 @@ body.dark .search-input {
     background: rgba(17, 24, 39, 0.8);
 }
 
+.sort-select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    background: rgba(255, 255, 255, 0.9);
+    color: inherit;
+}
+
+body.dark .sort-select {
+    border-color: var(--border-dark);
+    background: rgba(17, 24, 39, 0.8);
+}
+
+.overdue-count {
+    font-weight: 600;
+    color: var(--danger);
+}
+
+body.dark .overdue-count {
+    color: #fca5a5;
+}
+
 .clear-button {
     border: none;
     background: rgba(220, 38, 38, 0.08);

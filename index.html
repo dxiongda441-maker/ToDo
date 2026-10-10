@@ -30,6 +30,11 @@
             </div>
             <label class="visually-hidden" for="search-input">Search tasks</label>
             <input id="search-input" class="search-input" type="search" placeholder="Search tasks">
+            <label class="visually-hidden" for="sort-select">Sort tasks</label>
+            <select id="sort-select" class="sort-select" title="Sort tasks">
+                <option value="added">Newest first</option>
+                <option value="due">By due date</option>
+            </select>
             <button type="button" id="clear-completed" class="clear-button">Clear completed</button>
         </section>
 
@@ -41,6 +46,7 @@
         <footer class="summary" aria-live="polite">
             <span id="task-count">0 tasks</span>
             <span id="completed-count">0 completed tasks</span>
+            <span id="overdue-count" class="overdue-count" hidden></span>
             <div class="progress" aria-hidden="true"><div id="progress-bar" class="progress-bar"></div></div>
         </footer>
 

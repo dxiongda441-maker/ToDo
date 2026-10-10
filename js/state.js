@@ -9,6 +9,7 @@ TodoApp.state = (() => {
         archivedTasks: [],
         activeFilter: "all",
         searchQuery: "",
+        sortMode: "added",
         editingId: null,
         selectedDate: toDateKey(Date.now()),
         currentMonth: startOfMonth(new Date())
