@@ -87,11 +87,13 @@
         token: 0,
         recorded: false,
         puzzle: null, // 詰め問題を解いているときの問題データ
-        replay: null // 棋譜を再生しているとき { positions, index }
+        replay: null, // 棋譜を再生しているとき { positions, index }
+        lesson: null // レッスン中 { number, step }
     };
 
     const current = () => game.history[game.history.length - 1];
     // mode は "cpu"（CPU 対戦）/ "local"（2 人対戦）/ "puzzle"（詰め問題。相手は CPU）/ "replay"（棋譜の再生）
+    // / "lesson"（はじめての方へ。相手は指さない）
     const isCpuTurn = () => (game.mode === "cpu" || game.mode === "puzzle") && current().turn !== game.human && !current().result;
     const isHumanTurn = () => game.mode !== "replay" && !current().result
         && (game.mode === "local" || current().turn === game.human);
@@ -103,6 +105,9 @@
     function playerLabel(side) {
         if (game.mode === "replay") {
             return side === BLACK ? "先手" : "後手";
+        }
+        if (game.mode === "lesson") {
+            return side === BLACK ? "あなた" : "（動きません）";
         }
         if (game.mode !== "local") {
             return side === game.human ? "あなた" : "CPU";
@@ -202,6 +207,7 @@
             canCapture = threatsAgainst(position, -viewer);
         }
 
+        const goalSquare = game.mode === "lesson" ? lessonGoalSquare() : -1;
         const throneBlack = E.RULES.arrival === "throne" ? E.goalRow(WHITE) * SIZE + 3 : -1;
         const throneWhite = E.RULES.arrival === "throne" ? E.goalRow(BLACK) * SIZE + 3 : -1;
 
@@ -241,6 +247,9 @@
 
             const info = TILE_INFO[tile];
             let html = glyphSvg(tile) + `<span class="tile-kanji" aria-hidden="true">${info.kanji}</span>`;
+            if (index === goalSquare) {
+                html += '<span class="goal-star" aria-hidden="true">★</span>';
+            }
             let pieceText = "";
             if (piece !== 0) {
                 const side = piece > 0 ? BLACK : WHITE;
@@ -258,6 +267,9 @@
             if (selectedTargets.has(index)) {
                 label += piece !== 0 ? "。ここへ動いて取れます" : "。ここへ動けます";
             }
+            if (index === goalSquare) {
+                label += "。目標のマス（★）";
+            }
             if (index === throneBlack) {
                 label += "。黒の玉座（白の王が着くと白の勝ち）";
             } else if (index === throneWhite) {
@@ -272,11 +284,12 @@
         renderSelection();
         renderLog();
         boardCodeEl.textContent = E.seedToCode(position.seed);
-        codeCard.hidden = game.mode === "puzzle";
         $("#play-card").hidden = game.mode === "replay";
-        $(".record-actions").hidden = game.mode === "puzzle" || game.mode === "replay";
+        $(".record-actions").hidden = game.mode === "puzzle" || game.mode === "replay" || game.mode === "lesson";
+        codeCard.hidden = game.mode === "puzzle" || game.mode === "lesson";
         renderPuzzleCard();
         renderReplayCard();
+        renderLessonCard();
         undoButton.disabled = game.history.length <= 1 || game.thinking || game.mode === "replay";
         hintButton.disabled = !isHumanTurn() || game.thinking;
     }
@@ -327,6 +340,10 @@
             status = describeResult(position.result).title;
         } else if (game.thinking) {
             status = "CPU が考えています…";
+        } else if (game.mode === "lesson") {
+            const step = currentLessonStep();
+            // スマホでは説明のカードが盤の下に隠れるので、盤のすぐ下にも説明を出す
+            status = step ? step.text : "クリア！";
         } else if (game.mode === "replay") {
             status = `棋譜の再生中（${game.replay.index} / ${game.replay.positions.length - 1} 手）`;
         } else if (game.mode === "puzzle") {
@@ -498,6 +515,10 @@
         const position = current();
         if (game.mode === "puzzle") {
             puzzleAfterMove();
+            return;
+        }
+        if (game.mode === "lesson") {
+            lessonAfterMove();
             return;
         }
         if (position.result) {
@@ -746,6 +767,15 @@ self.onmessage = event => {
             startGame(Object.assign({}, settings, { seed: current().seed }));
         } else if (choice === "new") {
             startGame(Object.assign({}, settings, { seed: null }));
+        } else if (choice === "lesson-next") {
+            startLesson(game.lesson.number + 1);
+        } else if (choice === "lesson-exit") {
+            finishLessons();
+        } else if (choice === "lesson-play") {
+            settings = Object.assign({}, settings, { mode: "cpu", level: "easy", side: "black", handicap: "none" });
+            save(SETTINGS_KEY, settings);
+            game.lesson = null;
+            startGame(settings);
         } else if (choice === "replay") {
             startReplay(game.history.slice());
         } else if (choice === "puzzle-next") {
@@ -804,6 +834,7 @@ self.onmessage = event => {
     function startReplay(positions, index) {
         game.token += 1;
         game.mode = "replay";
+        game.lesson = null;
         game.puzzle = null;
         game.replay = { positions, index: index === undefined ? positions.length - 1 : index, evals: null };
         game.selected = null;
@@ -1020,6 +1051,192 @@ self.onmessage = event => {
         }
     }
 
+    // ---------- はじめての方へ（盤で試しながら覚えるレッスン） ----------
+    // 位置は 行 * 7 + 列（行 0 が上＝白の陣、行 6 が下＝黒の陣）。床は 0=十 1=斜 2=跳 3=走
+    const sq = (row, col) => row * SIZE + col;
+    const LESSONS = [
+        {
+            title: "床の紋のとおりに動く",
+            pieces: { [sq(4, 3)]: 1, [sq(6, 3)]: 2, [sq(0, 3)]: -2 },
+            tiles: { [sq(4, 3)]: 0, [sq(3, 3)]: 1 },
+            steps: [
+                { text: "黒の石は「十」の床の上にいます。十は縦横に 1 マス動けます。石を押して、★のマスへ動かしてみましょう。", goal: { type: "reach", square: sq(3, 3) } },
+                { text: "さっきまでいたマスの床が「十 → 斜」に変わりました。駒が離れた床は 1 段階変わります。今いる床は「斜」なので、斜めに 1 マス。★へ動かしましょう。", goal: { type: "reach", square: sq(2, 4) } }
+            ],
+            done: "駒の動きは、その駒が乗っている床が決めます。"
+        },
+        {
+            title: "跳ぶ床と走る床",
+            pieces: { [sq(5, 1)]: 1, [sq(4, 1)]: 1, [sq(5, 2)]: 1, [sq(6, 3)]: 2, [sq(0, 3)]: -2 },
+            tiles: { [sq(5, 1)]: 2, [sq(4, 1)]: 0, [sq(5, 2)]: 0, [sq(3, 2)]: 3 },
+            steps: [
+                { text: "左の石は「跳」の上。跳は桂馬の形に跳び、間にある駒は飛び越えられます。★へ跳んでみましょう。", goal: { type: "reach", square: sq(3, 2) } },
+                { text: "着いたマスは「走」。縦横にどこまでも進めます（駒は飛び越えられません）。★まで一気に進みましょう。", goal: { type: "reach", square: sq(3, 6) } }
+            ],
+            done: "跳と走は強い床。強い床に乗った駒は、遠くまで届きます。"
+        },
+        {
+            title: "離れた床は、次に誰かが使う",
+            pieces: { [sq(4, 2)]: 1, [sq(5, 2)]: 1, [sq(6, 3)]: 2, [sq(0, 3)]: -2 },
+            tiles: { [sq(4, 2)]: 2, [sq(5, 2)]: 0, [sq(3, 2)]: 1, [sq(2, 2)]: 0, [sq(1, 2)]: 1 },
+            steps: [
+                { text: "「跳」の上の石を、どこかへ動かしてください。離れた「跳」は「走」に変わります。", goal: { type: "leave", square: sq(4, 2) } },
+                { text: "強い「走」が生まれました。下の石（十の上）を、その「走」のマスへ 1 マス上げましょう。", goal: { type: "reach", square: sq(4, 2), from: sq(5, 2) } },
+                { text: "「走」に乗ったので、縦にどこまでも進めます。★へ。", goal: { type: "reach", square: sq(1, 2) } }
+            ],
+            done: "自分が離れた床は、相手が使うこともあります。どの床を残すかを考えるのが、うつろいの面白さです。"
+        },
+        {
+            title: "王を取れば勝ち",
+            pieces: { [sq(2, 1)]: 1, [sq(2, 5)]: -2, [sq(0, 0)]: -1, [sq(0, 6)]: -1, [sq(6, 3)]: 2, [sq(6, 0)]: 1 },
+            tiles: { [sq(2, 1)]: 3, [sq(2, 2)]: 0, [sq(2, 3)]: 1, [sq(2, 4)]: 0, [sq(2, 5)]: 0 },
+            steps: [
+                { text: "相手（白）の王を取れば勝ちです。「走」の石で、白の王を取りましょう。", goal: { type: "win" } }
+            ],
+            done: "王が取られそうなときは、王を逃がすか、間に駒を置いて守ります。「取られそうな駒」の表示も使ってみてください。"
+        },
+        {
+            title: "王が玉座に着いても勝ち",
+            pieces: { [sq(1, 4)]: 2, [sq(4, 0)]: -2, [sq(1, 0)]: -1, [sq(5, 5)]: 1 },
+            tiles: { [sq(1, 4)]: 3, [sq(0, 3)]: 0 },
+            steps: [
+                { text: "王だけは床に関係なく、周りの 8 マスに 1 歩動けます。点線の枠は「玉座」（相手の王が最初にいたマス）。自分の王が相手の玉座に着けば勝ちです。★へ。", goal: { type: "win" } }
+            ],
+            done: "王は攻めにも使えますが、前に出るほど狙われやすくなります。"
+        }
+    ];
+
+    function lessonPosition(lesson) {
+        const position = E.newGame(2026);
+        position.board = new Array(CELLS).fill(0);
+        Object.entries(lesson.pieces).forEach(([index, piece]) => {
+            position.board[Number(index)] = piece;
+        });
+        Object.entries(lesson.tiles).forEach(([index, tile]) => {
+            position.tiles[Number(index)] = tile;
+        });
+        position.startBlack = E.countPieces(position.board, BLACK);
+        position.startWhite = E.countPieces(position.board, WHITE);
+        return position;
+    }
+
+    function startLesson(number) {
+        const lesson = LESSONS[number];
+        if (!lesson) {
+            return;
+        }
+        game.token += 1;
+        game.mode = "lesson";
+        game.lesson = { number, step: 0 };
+        game.puzzle = null;
+        game.replay = null;
+        game.handicap = null;
+        game.swapEnabled = false;
+        game.swapTaken = null;
+        game.human = BLACK;
+        game.startHuman = BLACK;
+        game.history = [lessonPosition(lesson)];
+        game.moves = [];
+        game.selected = null;
+        game.hint = null;
+        game.thinking = false;
+        game.recorded = true;
+        game.flipManual = false;
+        game.flipped = false;
+        render();
+    }
+
+    function currentLessonStep() {
+        if (game.mode !== "lesson") {
+            return null;
+        }
+        const lesson = LESSONS[game.lesson.number];
+        return lesson.steps[game.lesson.step] || null;
+    }
+
+    function lessonGoalSquare() {
+        const step = currentLessonStep();
+        if (!step) {
+            return -1;
+        }
+        if (step.goal.type === "reach") {
+            return step.goal.square;
+        }
+        if (step.goal.type === "win") {
+            // 勝ち方を示すマス：王を取るなら白の王、玉座なら白の玉座
+            const position = current();
+            const king = position.board.indexOf(-KING);
+            const throne = E.goalRow(BLACK) * SIZE + Math.floor(SIZE / 2);
+            const blackKing = position.board.indexOf(KING);
+            return blackKing >= 0 && Math.max(Math.abs(E.rowOf(blackKing) - E.rowOf(throne)), Math.abs(E.colOf(blackKing) - E.colOf(throne))) === 1
+                ? throne
+                : king;
+        }
+        return -1;
+    }
+
+    function renderLessonCard() {
+        const card = $("#lesson-card");
+        card.hidden = game.mode !== "lesson";
+        if (game.mode !== "lesson") {
+            return;
+        }
+        const lesson = LESSONS[game.lesson.number];
+        const step = currentLessonStep();
+        $("#lesson-title").textContent = `はじめての方へ ${game.lesson.number + 1} / ${LESSONS.length}：${lesson.title}`;
+        $("#lesson-text").textContent = step ? step.text : lesson.done;
+        $("#lesson-progress").textContent = `ステップ ${Math.min(game.lesson.step + 1, lesson.steps.length)} / ${lesson.steps.length}`;
+        $("#lesson-skip").textContent = game.lesson.number + 1 < LESSONS.length ? "次のレッスンへ" : "対局してみる";
+    }
+
+    function lessonAfterMove() {
+        const position = current();
+        const step = currentLessonStep();
+        const move = position.lastMove;
+        const goal = step.goal;
+        let ok = false;
+        if (goal.type === "reach") {
+            ok = move.to === goal.square && (goal.from === undefined || move.from === goal.from);
+        } else if (goal.type === "leave") {
+            ok = move.from === goal.square;
+        } else if (goal.type === "win") {
+            ok = Boolean(position.result && position.result.winner === BLACK);
+        }
+
+        if (!ok) {
+            game.history.pop();
+            game.moves.pop();
+            render();
+            const message = goal.type === "leave"
+                ? "光っている「跳」の上の石を動かしてみましょう。"
+                : "★のマスを目指してみましょう。";
+            statusEl.textContent = message;
+            showToast(message);
+            return;
+        }
+
+        const lesson = LESSONS[game.lesson.number];
+        game.lesson.step += 1;
+        if (game.lesson.step >= lesson.steps.length) {
+            render();
+            const last = game.lesson.number + 1 >= LESSONS.length;
+            showResult("⭕", `レッスン ${game.lesson.number + 1}「${lesson.title}」クリア！`, lesson.done, last
+                ? [["lesson-play", "CPU（やさしい）と対局する", true], ["puzzle-list", "詰め問題に挑戦"]]
+                : [["lesson-next", "次のレッスンへ", true], ["lesson-exit", "終わる"]]);
+            return;
+        }
+        // レッスン中は相手が指さないので、黒の番のまま次のステップへ
+        if (!position.result) {
+            position.turn = BLACK;
+        }
+        render();
+    }
+
+    function finishLessons() {
+        game.lesson = null;
+        resumeSavedOrNew();
+    }
+
     // ---------- 詰め問題 ----------
     function loadSolved() {
         const solved = load(PUZZLE_KEY, {});
@@ -1073,6 +1290,7 @@ self.onmessage = event => {
         const position = E.decodePosition(puzzle);
         game.token += 1;
         game.mode = "puzzle";
+        game.lesson = null;
         game.puzzle = puzzle;
         game.level = "hard";
         game.handicap = null;
@@ -1259,6 +1477,7 @@ self.onmessage = event => {
         game.token += 1;
         game.puzzle = null;
         game.replay = null;
+        game.lesson = null;
         game.mode = options.mode === "local" ? "local" : "cpu";
         game.level = E.LEVELS[options.level] ? options.level : "normal";
         game.startHuman = options.startHuman !== undefined ? options.startHuman : resolveSide(options.side);
@@ -1356,8 +1575,8 @@ self.onmessage = event => {
 
     // ---------- 対局の保存と再開 ----------
     function saveGame() {
-        if (game.mode === "puzzle" || game.mode === "replay") {
-            return; // 詰め問題は保存しない（保存してある対局を上書きしない）
+        if (game.mode === "puzzle" || game.mode === "replay" || game.mode === "lesson") {
+            return; // 詰め問題・再生・レッスンは保存しない（保存してある対局を上書きしない）
         }
         save(GAME_KEY, {
             version: 1,
@@ -1578,6 +1797,24 @@ self.onmessage = event => {
                 stepReplay(event.key === "ArrowLeft" ? "prev" : "next");
             }
         });
+
+        $("#lesson-start").addEventListener("click", () => startLesson(0));
+        $("#rules-lesson").addEventListener("click", () => {
+            rulesDialog.close();
+            startLesson(0);
+        });
+        $("#lesson-retry").addEventListener("click", () => startLesson(game.lesson.number));
+        $("#lesson-skip").addEventListener("click", () => {
+            if (game.lesson.number + 1 < LESSONS.length) {
+                startLesson(game.lesson.number + 1);
+            } else {
+                settings = Object.assign({}, settings, { mode: "cpu", level: "easy", side: "black", handicap: "none" });
+                save(SETTINGS_KEY, settings);
+                game.lesson = null;
+                startGame(settings);
+            }
+        });
+        $("#lesson-exit").addEventListener("click", finishLessons);
 
         $("#puzzle-retry").addEventListener("click", () => startPuzzle(game.puzzle));
         $("#puzzle-next").addEventListener("click", () => startPuzzle(nextPuzzle()));

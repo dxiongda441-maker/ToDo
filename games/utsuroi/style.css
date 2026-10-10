@@ -139,7 +139,12 @@ input {
 
 .masthead-links {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
+}
+
+.masthead-links .link-button {
+    white-space: nowrap;
 }
 
 .link-button,
@@ -1037,6 +1042,48 @@ input {
     resize: vertical;
 }
 
+/* ---------- はじめての方へ（レッスン） ---------- */
+.link-button--accent {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: transparent;
+    font-weight: 700;
+}
+
+.link-button--accent:hover {
+    background: var(--accent);
+    filter: brightness(1.08);
+}
+
+.lesson-card {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(181, 69, 47, 0.25);
+}
+
+.lesson-card[hidden] {
+    display: none;
+}
+
+.lesson-text {
+    font-size: 1rem;
+    line-height: 1.7;
+}
+
+.goal-star {
+    position: absolute;
+    z-index: 2;
+    font-size: clamp(1.1rem, 4.5vw, 2rem);
+    color: var(--accent);
+    text-shadow: 0 0 6px var(--surface);
+    animation: goal-pulse 1.4s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes goal-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.18); opacity: 1; }
+}
+
 /* ---------- 詰め問題 ---------- */
 .puzzle-card {
     border-color: #16a34a;
@@ -1112,6 +1159,11 @@ input {
 @media (max-width: 520px) {
     .page {
         padding: 16px 16px 32px;
+    }
+
+    .masthead-links .link-button {
+        padding: 6px 12px;
+        font-size: 0.88rem;
     }
 
     .board-frame {

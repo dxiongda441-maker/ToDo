@@ -15,6 +15,7 @@
                 <p class="tagline">駒の動きは「床」が決める。床は、駒が離れるたびに移ろう。</p>
             </div>
             <nav class="masthead-links">
+                <button type="button" class="link-button link-button--accent" id="lesson-start">はじめての方へ</button>
                 <button type="button" class="link-button" data-open="rules-dialog">ルール</button>
                 <button type="button" class="link-button" data-open="puzzle-dialog">詰め問題</button>
                 <button type="button" class="link-button" data-open="setup-dialog">新しい対局</button>
@@ -36,6 +37,17 @@
             </section>
 
             <aside class="side" aria-label="対局の情報と操作">
+                <section class="card lesson-card" id="lesson-card" hidden>
+                    <h2 id="lesson-title"></h2>
+                    <p id="lesson-text" class="lesson-text"></p>
+                    <p id="lesson-progress" class="muted small"></p>
+                    <div class="actions">
+                        <button type="button" id="lesson-retry" class="action">やり直す</button>
+                        <button type="button" id="lesson-skip" class="action">次のレッスンへ</button>
+                        <button type="button" id="lesson-exit" class="action">終わる</button>
+                    </div>
+                </section>
+
                 <section class="card puzzle-card" id="puzzle-card" hidden>
                     <h2 id="puzzle-title"></h2>
                     <p id="puzzle-text"></p>
@@ -269,6 +281,7 @@
             <p>「新しい対局」で駒落ちを選ぶと、強い方の石を 1〜3 枚減らして始められます（端の石から減ります）。初心者と経験者、親子でも、いい勝負になるように調整できます。</p>
 
             <div class="dialog-actions">
+                <button type="button" class="secondary" id="rules-lesson">盤で試しながら覚える</button>
                 <button type="button" class="primary" data-close>閉じる</button>
             </div>
         </div>
