@@ -180,8 +180,18 @@ async function checkTodo(browser, width) {
         localStorage.setItem("todo.focus.v1", JSON.stringify(saved));
     });
     await page.reload();
-    const focusStats = await page.textContent("#focus-stats");
+    let focusStats = await page.textContent("#focus-stats");
     check(/1 session · 25 min · this task: 1/.test(focusStats) && (await page.textContent("#focus-mode")) === "Short break", `時間が来ると 記録して 休憩になる（${focusStats}）`);
+    await page.evaluate(() => {
+        const saved = JSON.parse(localStorage.getItem("todo.focus.v1"));
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        saved.days[TodoApp.utils.toDateKey(yesterday.getTime())] = { sessions: 2, minutes: 50 };
+        localStorage.setItem("todo.focus.v1", JSON.stringify(saved));
+    });
+    await page.reload();
+    focusStats = await page.textContent("#focus-stats");
+    check(focusStats.includes("2-day streak"), `何日 続けて 集中したかが 出る（${focusStats}）`);
 
     await page.click("h1");
     await page.keyboard.press("/");

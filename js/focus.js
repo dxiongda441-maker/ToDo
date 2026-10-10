@@ -190,6 +190,22 @@ TodoApp.focus = (() => {
         render();
     }
 
+    // 何日 つづけて 集中できているか（今日が まだ 0 回なら、昨日までの 連続を 数える）
+    function streakDays() {
+        const day = new Date();
+        day.setHours(12, 0, 0, 0);
+        const has = date => (focus.days[toDateKey(date.getTime())] || {}).sessions > 0;
+        if (!has(day)) {
+            day.setDate(day.getDate() - 1);
+        }
+        let count = 0;
+        while (has(day)) {
+            count += 1;
+            day.setDate(day.getDate() - 1);
+        }
+        return count;
+    }
+
     function activeTasks() {
         return state.tasks.filter(task => !task.completed);
     }
@@ -237,6 +253,10 @@ TodoApp.focus = (() => {
         const perTask = focus.taskId ? focus.perTask[focus.taskId] || 0 : 0;
         if (perTask > 0) {
             parts.push(`this task: ${perTask}`);
+        }
+        const streak = streakDays();
+        if (streak >= 2) {
+            parts.push(`${streak}-day streak`);
         }
         els.stats.textContent = parts.join(" · ");
 
