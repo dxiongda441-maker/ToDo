@@ -115,6 +115,8 @@
             ],
             // つぼ（しらべると 小さな ものが 入っている）
             pots: { "7,11": { item: "yakusou" }, "3,5": { gold: 10 }, "20,5": { item: "dokukeshisou" } },
+            // がんばりの木（ToDo の がんばりが とどくたびに 育つ）
+            effortTree: { x: 2, y: 8 },
             place: "1",
             entry: { x: 11, y: 16 },
             npcs: [

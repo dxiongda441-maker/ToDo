@@ -553,6 +553,9 @@
         if (npcAt(x, y)) {
             return false;
         }
+        if (map.effortTree && map.effortTree.x === x && map.effortTree.y === y) {
+            return false;
+        }
         if (forNpc && (x === game.x && y === game.y)) {
             return false;
         }
@@ -793,6 +796,8 @@
                 await checkPedestal(tx, ty);
             } else if (tileAt(tx, ty) === "o") {
                 await searchPot(tx, ty);
+            } else if (currentMap().effortTree && currentMap().effortTree.x === tx && currentMap().effortTree.y === ty) {
+                await effortTreeDialog();
             } else {
                 busy = false;
                 await fieldMenu();
@@ -839,6 +844,84 @@
 
     function chestKey(x, y) {
         return `${game.map}:${x},${y}`;
+    }
+
+    // がんばりの木：とどいた がんばりのたねの 数で 育つ
+    function effortCount() {
+        return game.todo.redeemed.length;
+    }
+
+    function effortStage() {
+        return data.effortTree.filter(stage => effortCount() >= stage.count).length;
+    }
+
+    async function effortTreeDialog() {
+        const count = effortCount();
+        const stage = effortStage();
+        await say(stage === 0
+            ? "「がんばりの木」と かかれた 立てふだが ある。\nToDo で がんばると、ここに 木が 育つらしい。"
+            : `がんばりの木（${data.effortTree[stage - 1].name}）。\nこれまでに とどいた がんばり：${count}こ`);
+        for (let i = 0; i < stage; i += 1) {
+            const flag = `tree${i + 1}`;
+            if (game.flags[flag]) {
+                continue;
+            }
+            const before = JSON.stringify(game.bag);
+            if (!data.effortTree[i].items.every(([id, n]) => R.addItem(game.bag, id, n))) {
+                game.bag = JSON.parse(before);
+                await say("木に 実が なっているが、どうぐぶくろが いっぱいで とれない。");
+                return;
+            }
+            game.flags[flag] = true;
+            audio.jingle("item");
+            note(`がんばりの木が ${data.effortTree[i].name}に 育った。（がんばり ${count}こ）`);
+            const names = data.effortTree[i].items.map(([id, n]) => (n > 1 ? `${data.items[id].name}を ${n}こ` : `${data.items[id].name}を`));
+            await say(`がんばりの木は ${data.effortTree[i].text}\n実の なかから ${names.join("、")} 手に入れた！`);
+        }
+        const next = data.effortTree[stage];
+        if (next) {
+            await say(`つぎの すがたまで あと ${next.count - count}この がんばり。\n（ToDo で タスクを 終えたり、集中タイマーで 集中したり しよう）`);
+        }
+        saveGame();
+    }
+
+    // 木を 描く（育ち具合で 大きさが かわる）
+    function drawEffortTree(x, y, stage) {
+        const leaf = ["#4fa35a", "#3f8f4a", "#2e7d3a"];
+        if (stage === 0) {
+            // 立てふだ
+            ctx.fillStyle = "#6b4022";
+            ctx.fillRect(x + 7, y + 7, 2, 8);
+            ctx.fillStyle = "#c89a62";
+            ctx.fillRect(x + 3, y + 3, 10, 6);
+            ctx.fillStyle = "#6b4022";
+            ctx.fillRect(x + 5, y + 5, 6, 1);
+            return;
+        }
+        if (stage === 1) {
+            ctx.fillStyle = "#6b4022";
+            ctx.fillRect(x + 5, y + 13, 6, 2);
+            ctx.fillStyle = leaf[0];
+            ctx.fillRect(x + 7, y + 8, 2, 5);
+            ctx.fillRect(x + 4, y + 7, 3, 2);
+            ctx.fillRect(x + 9, y + 6, 3, 2);
+            return;
+        }
+        const size = stage === 2 ? 8 : stage === 3 ? 12 : 16;
+        const top = y + 16 - size - (stage === 4 ? 10 : 4);
+        ctx.fillStyle = "#5b3a1a";
+        ctx.fillRect(x + 6, y + 16 - (stage === 4 ? 12 : 6), 4, stage === 4 ? 12 : 6);
+        ctx.fillStyle = leaf[2];
+        ctx.fillRect(x + 8 - size / 2, top + 2, size, size - 2);
+        ctx.fillStyle = leaf[1];
+        ctx.fillRect(x + 8 - size / 2 + 1, top, size - 2, size - 3);
+        ctx.fillStyle = leaf[0];
+        ctx.fillRect(x + 8 - size / 2 + 2, top + 1, size / 2, size / 3);
+        if (stage === 4) {
+            // 星の 実
+            ctx.fillStyle = frameNo % 2 ? "#ffe066" : "#fff7c2";
+            [[4, 4], [11, 6], [7, 10], [13, 12], [2, 11]].forEach(([dx, dy]) => ctx.fillRect(x + dx, top + dy, 2, 2));
+        }
     }
 
     // つぼを しらべる（なかみは 1 回だけ。宝箱と おなじ 記録に のこす）
@@ -2467,6 +2550,10 @@
                 }
                 ctx.drawImage(S.tile(map.tileset, ch, frameNo, open), tx * TILE - camX, ty * TILE - camY);
             }
+        }
+        // がんばりの木
+        if (map.effortTree) {
+            drawEffortTree(map.effortTree.x * TILE - camX, map.effortTree.y * TILE - camY, effortStage());
         }
         // 人
         field.npcs.forEach(npc => {

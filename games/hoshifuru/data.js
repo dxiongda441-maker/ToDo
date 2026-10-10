@@ -247,7 +247,15 @@
         ]
     };
 
-    const data = { classes, spells, items, equipment, enemies, skills, zones, arena, bookRewards, partyTalk };
+    // がんばりの木（ソラの村）：これまでに とどいた がんばりのたねの 数で 育ち、育つたびに 実を くれる
+    const effortTree = [
+        { count: 1, name: "め", text: "ちいさな めが でた！", items: [["yakusou", 3]] },
+        { count: 5, name: "わかぎ", text: "わかぎに そだった！", items: [["mahounomizu", 2]] },
+        { count: 15, name: "き", text: "りっぱな 木に なった！", items: [["fukkatsunohane", 1], ["ganbarinotane", 1]] },
+        { count: 40, name: "たいじゅ", text: "星の 実を つけた たいじゅに なった！", items: [["ganbarinotane", 3]] }
+    ];
+
+    const data = { classes, spells, items, equipment, enemies, skills, zones, arena, bookRewards, partyTalk, effortTree };
 
     const HF = root.HF = root.HF || {};
     HF.data = data;

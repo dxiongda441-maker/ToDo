@@ -274,6 +274,18 @@ test("なかまとの 会話：場所は 実在し、せりふは 文字", () =>
     });
 });
 
+test("がんばりの木：草の上にあり、育つ数は 順に 大きく、実は 実在する", () => {
+    const tree = maps.sora.effortTree;
+    assert.equal(tileAt(maps.sora, tree.x, tree.y), ",");
+    assert.ok(!(maps.sora.npcs || []).some(npc => npc.x === tree.x && npc.y === tree.y));
+    let last = 0;
+    data.effortTree.forEach(stage => {
+        assert.ok(stage.count > last, stage.name);
+        last = stage.count;
+        stage.items.forEach(([id]) => assert.ok(data.items[id], id));
+    });
+});
+
 console.log("[ルール]");
 
 test("必要な経験値は レベルごとに増え、成長で能力が下がらない", () => {
