@@ -161,16 +161,25 @@
         return entry ? entry.count : 0;
     }
 
-    function addItem(bag, id, count = 1) {
+    // 入りきらないとき（種類が いっぱい・99 こを こえる）は 何も 入れずに false
+    function canAddItem(bag, id, count = 1) {
         const entry = bag.find(e => e.id === id);
         if (entry) {
-            entry.count = Math.min(99, entry.count + count);
-            return true;
+            return entry.count + count <= 99;
         }
-        if (bag.length >= BAG_LIMIT) {
+        return bag.length < BAG_LIMIT && count <= 99;
+    }
+
+    function addItem(bag, id, count = 1) {
+        if (!canAddItem(bag, id, count)) {
             return false;
         }
-        bag.push({ id, count: Math.min(99, count) });
+        const entry = bag.find(e => e.id === id);
+        if (entry) {
+            entry.count += count;
+        } else {
+            bag.push({ id, count });
+        }
         return true;
     }
 
@@ -735,6 +744,8 @@
                     events.push({ type: "allyHit", index: i, amount, hp: member.hp, poison: true, text: `${member.name}は どくで ${amount}の ダメージ！` });
                     if (member.hp <= 0) {
                         member.poison = false;
+                        // たおれたら ねむりや 強化も なくなる（damageAlly と 同じ）
+                        battle.allyState[i] = { atkUp: 0, defUp: 0, sleep: 0, defending: false };
                         events.push({ type: "allyDown", index: i, text: `${member.name}は たおれた…` });
                     }
                 }
@@ -867,6 +878,7 @@
         createBag,
         itemCount,
         addItem,
+        canAddItem,
         removeItem,
         sellPrice,
         healAmount,

@@ -396,6 +396,27 @@ test("さくせん：じゅもんせつやく では 攻撃じゅもんを つ�
     assert.equal(spellOf("attack").type, "spell");
 });
 
+test("どうぐ：99 こを こえる ぶんは 入れずに false（なくならない）", () => {
+    const bag = R.createBag();
+    assert.ok(R.addItem(bag, "ganbarinotane", 97));
+    assert.ok(!R.addItem(bag, "ganbarinotane", 5));
+    assert.equal(R.itemCount(bag, "ganbarinotane"), 97);
+    assert.ok(R.addItem(bag, "ganbarinotane", 2));
+    assert.ok(!R.canAddItem(bag, "ganbarinotane"));
+});
+
+test("どくで たおれると ねむりや 強化も なくなる", () => {
+    const rng = seededRng(2);
+    const hero = R.createMember("hero", "ユウ", 5, rng);
+    const battle = R.createBattle([hero], ["pururin"]);
+    hero.hp = 1;
+    hero.poison = true;
+    battle.allyState[0] = { atkUp: 2, defUp: 1, sleep: 3, defending: false };
+    R.resolveRound(battle, [{ type: "defend" }], R.createBag(), rng);
+    assert.equal(hero.hp, 0);
+    assert.deepEqual(battle.allyState[0], { atkUp: 0, defUp: 0, sleep: 0, defending: false });
+});
+
 console.log("[音]");
 
 test("MML：音の高さと長さ", () => {

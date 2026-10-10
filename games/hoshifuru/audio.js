@@ -470,6 +470,10 @@
             if (ctx.state === "suspended") {
                 ctx.resume();
             }
+            // 音の 時計が 止まっている（iPhone で 電話が きた など）と 曲が 終わらないので、待たない
+            if (ctx.state !== "running") {
+                return Promise.resolve();
+            }
             stopTrack(bgmPlayer);
             bgmPlayer = null;
             const previous = jinglePlayer;
@@ -484,6 +488,9 @@
                 });
                 player.finish = resolve;
                 jinglePlayer = player;
+                // とちゅうで 時計が 止まっても 待ちつづけないように、曲の 長さ ＋ 1 秒で あきらめる
+                const track = parsed[name];
+                setTimeout(resolve, (track.beats * 60 / track.tempo) * 1000 + 1000);
             });
         }
     };

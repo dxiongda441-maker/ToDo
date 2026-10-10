@@ -995,8 +995,11 @@
             await say("だいざの 上で なにかが 光っている。");
             return;
         }
+        if (!R.addItem(game.bag, pedestal.item)) {
+            await say("光る ものが あるが、どうぐぶくろが いっぱいで もてない。");
+            return;
+        }
         game.flags[pedestal.flag] = true;
-        R.addItem(game.bag, pedestal.item);
         note(`${data.items[pedestal.item].name}を 手に入れた。`);
         audio.jingle("item");
         await sayAll(pedestal.text);
@@ -1051,8 +1054,7 @@
                 await warpTo(arg, extra[0], extra[1], extra[2] || "up");
                 return true;
             } else if (name === "give") {
-                R.addItem(game.bag, arg);
-                await say(`${data.items[arg].name}を 手に入れた！`);
+                await say(R.addItem(game.bag, arg) ? `${data.items[arg].name}を 手に入れた！` : `${data.items[arg].name}を もらったが、どうぐぶくろが いっぱいで もてなかった…`);
             } else if (name === "equip") {
                 R.addItem(game.bag, arg);
             } else if (name === "gold") {
@@ -1307,6 +1309,9 @@
         }
         const commands = [];
         const members = game.party.map((m, i) => i);
+        // いちばん 最初に 命令できる人（主人公が たおれていたり ねむっていたりしても、にげる・おまかせを えらべるように）
+        const canAct = idx => game.party[idx].hp > 0 && battle.allyState[idx].sleep <= 0;
+        const firstK = Math.max(0, members.findIndex(canAct));
         let k = 0;
         while (k < members.length) {
             const i = members[k];
@@ -1329,11 +1334,11 @@
                 { label: "どうぐ", value: "item" },
                 { label: "ぼうぎょ", value: "defend" }
             ];
-            if (k === 0) {
+            if (k === firstK) {
                 options.push({ label: "にげる", value: "flee" });
                 options.push({ label: "おまかせ", value: "auto" });
             }
-            const choice = await choose(options, { style: { left: "3%", bottom: "3%", minWidth: "38%" }, title: member.name, cols: 2, cancel: k > 0 });
+            const choice = await choose(options, { style: { left: "3%", bottom: "3%", minWidth: "38%" }, title: member.name, cols: 2, cancel: k > firstK });
             enemyList.remove();
             if (choice === null) {
                 // ひとつ前の人の命令からやり直す
@@ -1752,9 +1757,10 @@
                 const able = game.party.map((m, i) => i).filter(i => R.canEquip(game.party[i], id));
                 if (able.length > 0 && await yesNo(`${item.name}ですね。 まいど ありがとうございます！\nいま ここで そうびして いきますか？`)) {
                     const who = able.length === 1 ? able[0] : await choose(able.map(i => ({ label: game.party[i].name, value: i })), { style: { right: "6%", bottom: "38%" }, title: "だれが？" });
-                    if (who !== null) {
-                        equipItem(game.party[who], id);
+                    if (who !== null && equipItem(game.party[who], id)) {
                         await say(`${game.party[who].name}は ${item.name}を そうびした！`);
+                    } else if (who !== null) {
+                        await say("どうぐぶくろが いっぱいで、いま つけている ものを しまえませんね。");
                     }
                 }
             } else {
@@ -1790,12 +1796,18 @@
     }
 
     // そうびする（今つけている物は 袋にもどす）
+    // そうびする。はずした物が ふくろに 入らないときは そうびしない（はずした物が 消えないように）
     function equipItem(member, equipId) {
         const item = data.equipment[equipId];
         const old = member.equip[item.slot];
-        if (!R.removeItem(game.bag, equipId)) {
+        if (R.itemCount(game.bag, equipId) < 1) {
             return false;
         }
+        const frees = R.itemCount(game.bag, equipId) === 1; // 取り出すと ふくろの 1 わくが あく
+        if (old && old !== equipId && !R.canAddItem(game.bag, old) && !frees) {
+            return false;
+        }
+        R.removeItem(game.bag, equipId);
         if (old) {
             R.addItem(game.bag, old);
         }
@@ -1850,7 +1862,10 @@
         status.remove();
         gold.remove();
         closeMessage();
-        busy = false;
+        // 「タイトルへ もどる」を えらんだときは タイトルが busy を あつかうので さわらない
+        if (scene === "field") {
+            busy = false;
+        }
     }
 
     async function pickMember(title, style) {
@@ -2083,9 +2098,11 @@
                 if (old && R.addItem(game.bag, old)) {
                     member.equip[slot] = null;
                 }
-            } else {
-                equipItem(member, choice);
+            } else if (equipItem(member, choice)) {
                 audio.se("equip");
+            } else {
+                await say("どうぐぶくろが いっぱいで、いま つけている ものを しまえない。");
+                closeMessage();
             }
             status.refresh();
         }
