@@ -11,7 +11,7 @@ const path = require("node:path");
 const createEngine = require(path.join(__dirname, "..", "games", "utsuroi", "engine.js"));
 
 const E = createEngine();
-const TARGET = { 1: 8, 2: 12, 3: 10 }; // 自分の手数ごとの問題数
+const TARGET = { 1: 12, 2: 20, 3: 18 }; // 自分の手数ごとの問題数
 const found = { 1: [], 2: [], 3: [] };
 const seen = new Set();
 
@@ -21,6 +21,18 @@ Math.random = () => {
     state = (state * 1103515245 + 12345) % 2147483648;
     return state / 2147483648;
 };
+
+// 局面から決まる短い ID（FNV-1a）。作り直しても同じ局面なら同じ ID になり、
+// 「解いた」記録（ID で保存）が別の問題に付け替わらない
+function positionId(position) {
+    const text = `${position.tiles}|${position.board}|${position.turn}`;
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < text.length; i += 1) {
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    return hash.toString(36);
+}
 
 function enough() {
     return Object.keys(TARGET).every(k => found[k].length >= TARGET[k]);
@@ -39,7 +51,7 @@ function classify(position) {
     return null;
 }
 
-for (let game = 1; game <= 400 && !enough(); game += 1) {
+for (let game = 1; game <= 800 && !enough(); game += 1) {
     let position = E.newGame(game * 7919 + 13);
     const levels = game % 3 === 0 ? ["easy", "normal"] : ["normal", "normal"];
     let fromThisGame = 0; // 似た問題が並ばないよう、1 局から取るのは 2 問まで
@@ -69,8 +81,8 @@ console.log();
 
 const puzzles = [];
 [1, 2, 3].forEach(moves => {
-    found[moves].forEach((entry, i) => {
-        puzzles.push(Object.assign({ id: `m${moves}-${String(i + 1).padStart(2, "0")}` }, entry.position, {
+    found[moves].forEach(entry => {
+        puzzles.push(Object.assign({ id: `m${moves}-${positionId(entry.position)}` }, entry.position, {
             moves: entry.moves,
             solution: entry.solution
         }));
