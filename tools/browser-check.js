@@ -5,6 +5,8 @@
 // Playwright が必要（このリポジトリには入れない）。見つからなければ何もせずに終わる。
 // 例：NODE_PATH="$(npm root -g)" node tools/browser-check.js
 // 外部の背景画像は読み込まない（ネットにつながらない環境でも同じ結果になるように）。
+// axe-core があれば、アクセシビリティの自動チェックもする（AXE_PATH に axe.min.js の場所を渡すか、
+// require("axe-core") で見つかる場所に入れておく）。
 "use strict";
 
 const path = require("node:path");
@@ -42,6 +44,29 @@ async function newPage(browser, viewport) {
 }
 
 const texts = page => page.$$eval(".task-text", els => els.map(el => el.textContent));
+
+const axePath = (() => {
+    if (process.env.AXE_PATH) {
+        return process.env.AXE_PATH;
+    }
+    try {
+        return require.resolve("axe-core/axe.min.js");
+    } catch (_error) {
+        return null;
+    }
+})();
+
+async function checkAccessibility(page, label) {
+    if (!axePath) {
+        return;
+    }
+    await page.addScriptTag({ path: axePath });
+    const violations = await page.evaluate(async () => {
+        const result = await window.axe.run(document, { resultTypes: ["violations"] });
+        return result.violations.map(v => `${v.id}（${v.nodes.length} か所）: ${v.help}`);
+    });
+    check(violations.length === 0, `アクセシビリティ（axe）: ${label} ${violations.join(" / ")}`);
+}
 
 async function checkTodo(browser, width) {
     console.log(`[ToDo アプリ・幅 ${width}px]`);
@@ -111,6 +136,7 @@ async function checkTodo(browser, width) {
 
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     check(scrollWidth <= width, `横にはみ出さない（${scrollWidth}px）`);
+    await checkAccessibility(page, "ToDo");
     check(errors.length === 0, `JavaScript のエラーなし ${errors.join(" / ")}`);
     await page.close();
 }
@@ -144,6 +170,7 @@ async function checkGame(browser, width) {
     await page.click("#undo-button");
     await page.waitForTimeout(200);
     check((await page.$$("#move-log li")).length === 0, "待ったで戻せる");
+    await checkAccessibility(page, "うつろい");
 
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     check(scrollWidth <= width, `横にはみ出さない（${scrollWidth}px）`);
@@ -152,6 +179,9 @@ async function checkGame(browser, width) {
 }
 
 (async () => {
+    if (!axePath) {
+        console.log("（axe-core が見つからないため、アクセシビリティの自動チェックは飛ばします）");
+    }
     const browser = await chromium.launch();
     try {
         for (const width of [375, 1024]) {

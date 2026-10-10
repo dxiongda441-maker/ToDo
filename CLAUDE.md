@@ -21,6 +21,7 @@
 2. `index.html` をブラウザで開き、タスクの追加・完了・編集・削除、フィルター、検索、
    「Clear completed」と Undo、履歴カレンダーの月の切り替えと Restore、配色の切り替えを確かめる。
    Playwright がある環境なら `node tools/browser-check.js` でまとめて確かめられる（375px と 1024px）。
+   axe-core の `axe.min.js` があれば `AXE_PATH=…/axe.min.js` を付けると、アクセシビリティの自動チェックもする。
 3. スマホ幅（375px）で崩れていないか見る。
 
 ## ゲーム（games/utsuroi）

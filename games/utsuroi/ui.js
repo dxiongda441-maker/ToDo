@@ -135,7 +135,15 @@
     const cells = [];
     function buildBoard() {
         boardEl.innerHTML = "";
+        // role="grid" には role="row" が必要。行の箱は display: contents なので並びには影響しない
+        let rowEl = null;
         for (let view = 0; view < CELLS; view += 1) {
+            if (view % SIZE === 0) {
+                rowEl = document.createElement("div");
+                rowEl.className = "board-row";
+                rowEl.setAttribute("role", "row");
+                boardEl.appendChild(rowEl);
+            }
             const cell = document.createElement("button");
             cell.type = "button";
             cell.className = "cell";
@@ -144,7 +152,7 @@
             cell.dataset.view = String(view);
             cell.addEventListener("click", () => onCellClick(viewToIndex(view)));
             cell.addEventListener("keydown", event => onCellKeydown(event, view));
-            boardEl.appendChild(cell);
+            rowEl.appendChild(cell);
             cells.push(cell);
         }
     }
