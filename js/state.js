@@ -11,6 +11,7 @@ TodoApp.state = (() => {
         searchQuery: "",
         sortMode: "added",
         editingId: null,
+        movedId: null,
         selectedDate: toDateKey(Date.now()),
         currentMonth: startOfMonth(new Date())
     };

@@ -32,7 +32,7 @@
             <input id="search-input" class="search-input" type="search" placeholder="Search tasks">
             <label class="visually-hidden" for="sort-select">Sort tasks</label>
             <select id="sort-select" class="sort-select" title="Sort tasks">
-                <option value="added">Newest first</option>
+                <option value="added">My order</option>
                 <option value="due">By due date</option>
             </select>
             <button type="button" id="clear-completed" class="clear-button">Clear completed</button>
@@ -89,6 +89,9 @@
 
     <template id="task-template">
         <li class="task-item">
+            <button type="button" class="drag-handle" title="Drag to reorder (or Alt+↑ / Alt+↓)" aria-label="Reorder task. Use Alt+Up or Alt+Down.">
+                <svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.5"/><circle cx="7.5" cy="3" r="1.5"/><circle cx="2.5" cy="8" r="1.5"/><circle cx="7.5" cy="8" r="1.5"/><circle cx="2.5" cy="13" r="1.5"/><circle cx="7.5" cy="13" r="1.5"/></svg>
+            </button>
             <label class="task-main">
                 <input type="checkbox" class="task-toggle">
                 <span class="task-body">

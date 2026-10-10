@@ -6,7 +6,8 @@
 
 - タスクの追加・完了・その場で編集（Enter で保存、Esc で取り消し）・削除
 - 期限日（任意）。「Overdue（期限切れ）」「Due today」「Due tomorrow」を色と文字で表示
-- 検索・フィルター（All / Active / Completed）・並び替え（新しい順 / 期限日順）・完了率のバー・期限切れの件数
+- 検索・フィルター（All / Active / Completed）・並び順（自分で決めた順 / 期限日順）・完了率のバー・期限切れの件数
+- 並べ替え：左のつまみをドラッグ（マウス・タッチ）、またはつまみにフォーカスして ↑↓、タスクのどこかにフォーカスして Alt+↑↓
 - 削除や「Clear completed」の直後に出るお知らせから「Undo」（または Ctrl+Z / ⌘Z）で元に戻せる
 - 履歴カレンダー：日ごとに追加・削除したタスクを表示。削除したタスクは「Restore」で一覧に戻せる
 - 配色：Auto（端末の設定に合わせる）/ Light / Dark
@@ -25,7 +26,7 @@
 | `todo.tasks.v1` | 今のタスク一覧 `{ id, text, completed, createdAt, dueDate? }`（`dueDate` は `"YYYY-MM-DD"`、無ければ項目ごと省く） |
 | `todo.archive.v1` | 削除・一括削除したタスク（上の項目 ＋ `deletedAt`・`reason`） |
 | `todo.theme.v1` | 配色の設定（`auto` / `light` / `dark`） |
-| `todo.sort.v1` | 並び順（`added` / `due`） |
+| `todo.sort.v1` | 並び順（`added`＝自分で決めた順 / `due`＝期限日順）。自分で決めた順はタスク一覧の配列の順番そのもの |
 
 ## ディレクトリ構成
 

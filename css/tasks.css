@@ -195,6 +195,56 @@ body.dark .task-item {
     box-shadow: 0 12px 24px rgba(15, 23, 42, 0.15);
 }
 
+/* ---------- 並べ替えのつまみ ---------- */
+.drag-handle {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 2rem;
+    margin-left: -0.5rem;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: #94a3b8;
+    cursor: grab;
+    touch-action: none;
+}
+
+.drag-handle svg {
+    width: 0.6rem;
+    height: 1rem;
+    fill: currentColor;
+}
+
+.drag-handle:hover,
+.drag-handle:focus-visible {
+    background: rgba(148, 163, 184, 0.2);
+    color: inherit;
+}
+
+.drag-handle[hidden] {
+    display: none;
+}
+
+.task-item.dragging {
+    position: relative;
+    z-index: 2;
+    cursor: grabbing;
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.25);
+    transition: none;
+}
+
+.task-item.moved {
+    animation: task-moved 0.4s ease;
+}
+
+@keyframes task-moved {
+    0% { box-shadow: 0 0 0 3px var(--accent); }
+    100% { box-shadow: none; }
+}
+
 .task-main {
     display: flex;
     align-items: flex-start;

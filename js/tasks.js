@@ -233,9 +233,20 @@ TodoApp.tasks = (() => {
             const actions = node.querySelector(".task-actions");
             const editButton = node.querySelector(".edit-button");
             const deleteButton = node.querySelector(".delete-button");
+            const handle = node.querySelector(".drag-handle");
 
             item.dataset.id = task.id;
             item.classList.toggle("completed", Boolean(task.completed));
+
+            if (handle) {
+                // 期限日順のときは並びが日付で決まるので、手で並べ替えない
+                handle.hidden = state.sortMode === "due" || task.id === state.editingId;
+                handle.addEventListener("pointerdown", event => startDrag(event, item));
+                handle.addEventListener("keydown", event => onHandleKeydown(event, task.id));
+            }
+            if (task.id === state.movedId) {
+                item.classList.add("moved");
+            }
 
             if (task.id === state.editingId) {
                 const editor = buildEditor(task, draft && draft.id === task.id ? draft : null);
@@ -394,6 +405,142 @@ TodoApp.tasks = (() => {
         if (button) {
             button.focus();
         }
+    }
+
+    // ---------- 並べ替え ----------
+    // 表示中のタスクの新しい並び（id の配列）を、全体の並びに反映する。
+    // 表示中のタスクが占めていた位置に、新しい順で入れ直すので、フィルターや検索中でも
+    // 表示されていないタスクの位置は変わらない
+    function applyVisibleOrder(orderedIds) {
+        const visible = new Set(orderedIds);
+        const slots = [];
+        state.tasks.forEach((task, index) => {
+            if (visible.has(task.id)) {
+                slots.push(index);
+            }
+        });
+        const byId = new Map(state.tasks.map(task => [task.id, task]));
+        const next = state.tasks.slice();
+        orderedIds.forEach((id, k) => {
+            next[slots[k]] = byId.get(id);
+        });
+        const changed = next.some((task, index) => task !== state.tasks[index]);
+        if (changed) {
+            state.tasks = next;
+            storage.saveTasks();
+        }
+        return changed;
+    }
+
+    function visibleIds() {
+        return Array.from(list.querySelectorAll(".task-item")).map(item => item.dataset.id);
+    }
+
+    function focusHandle(id) {
+        const item = Array.from(list.querySelectorAll(".task-item")).find(el => el.dataset.id === id);
+        const handle = item && item.querySelector(".drag-handle");
+        if (handle) {
+            handle.focus();
+        }
+    }
+
+    function moveTask(id, offset) {
+        const ids = visibleIds();
+        const from = ids.indexOf(id);
+        const to = from + offset;
+        if (from < 0 || to < 0 || to >= ids.length) {
+            return;
+        }
+        ids.splice(from, 1);
+        ids.splice(to, 0, id);
+        if (applyVisibleOrder(ids)) {
+            state.movedId = id;
+            renderTasks();
+            state.movedId = null;
+            focusHandle(id);
+        }
+    }
+
+    function onHandleKeydown(event, id) {
+        if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+            // つまみにフォーカスがあるときは矢印だけで、ほかの場所では Alt+矢印で動かせる
+            event.preventDefault();
+            moveTask(id, event.key === "ArrowUp" ? -1 : 1);
+        }
+    }
+
+    function onListKeydown(event) {
+        if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) {
+            return;
+        }
+        const item = event.target.closest && event.target.closest(".task-item");
+        if (!item || item.classList.contains("editing") || state.sortMode === "due") {
+            return;
+        }
+        event.preventDefault();
+        moveTask(item.dataset.id, event.key === "ArrowUp" ? -1 : 1);
+    }
+
+    // つまみを押したままドラッグ（マウス・タッチ共通）。動かしている間は DOM の並びだけを入れ替え、
+    // 離したときにその並びを保存する
+    function startDrag(event, item) {
+        if (event.button !== undefined && event.button !== 0) {
+            return;
+        }
+        event.preventDefault();
+        const pointerId = event.pointerId;
+        item.classList.add("dragging");
+        let lastY = event.clientY;
+        let offset = 0;
+
+        // DOM の中で要素を動かすとポインターのキャプチャが外れるので、window で受け取る
+        const onMove = moveEvent => {
+            if (moveEvent.pointerId !== pointerId) {
+                return;
+            }
+            offset += moveEvent.clientY - lastY;
+            lastY = moveEvent.clientY;
+            item.style.transform = `translateY(${offset}px)`;
+
+            const siblings = Array.from(list.querySelectorAll(".task-item")).filter(el => el !== item);
+            const before = siblings.find(el => {
+                const rect = el.getBoundingClientRect();
+                return moveEvent.clientY < rect.top + rect.height / 2;
+            });
+            const oldTop = item.getBoundingClientRect().top - offset;
+            if (before) {
+                if (item.nextElementSibling !== before) {
+                    list.insertBefore(item, before);
+                }
+            } else if (list.lastElementChild !== item) {
+                list.appendChild(item);
+            }
+            // DOM の中で位置が変わった分だけ、見た目のずれを付け直す（指の下に留まるように）
+            const newTop = item.getBoundingClientRect().top - offset;
+            offset -= newTop - oldTop;
+            item.style.transform = `translateY(${offset}px)`;
+        };
+
+        const onEnd = endEvent => {
+            if (endEvent.pointerId !== pointerId) {
+                return;
+            }
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onEnd);
+            window.removeEventListener("pointercancel", onEnd);
+            item.classList.remove("dragging");
+            item.style.transform = "";
+            const id = item.dataset.id;
+            if (applyVisibleOrder(visibleIds())) {
+                state.movedId = id;
+            }
+            renderTasks();
+            state.movedId = null;
+        };
+
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onEnd);
+        window.addEventListener("pointercancel", onEnd);
     }
 
     // 指定したタスクをまとめて履歴へ移す。トーストの「Undo」で元の位置に戻せる
@@ -566,6 +713,7 @@ TodoApp.tasks = (() => {
             });
         }
 
+        list.addEventListener("keydown", onListKeydown);
         clearCompletedButton.addEventListener("click", clearCompletedTasks);
         updateFilterButtons();
     }

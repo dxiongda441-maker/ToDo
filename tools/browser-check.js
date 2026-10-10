@@ -69,6 +69,11 @@ async function checkTodo(browser, width) {
     check((await texts(page)).join() === "Buy oat milk", "フィルター（Active）");
     await page.click("[data-filter=all]");
 
+    await page.focus(".task-item:has(.task-text:text-is('Buy oat milk')) .drag-handle");
+    await page.keyboard.press("ArrowUp");
+    check((await texts(page)).join() === "Buy oat milk,Write report", "つまみと矢印キーで並べ替えられる");
+    await page.keyboard.press("ArrowDown");
+
     await page.selectOption("#sort-select", "due");
     check((await texts(page))[0] === "Buy oat milk", "期限日順に並べ替えられる");
     await page.selectOption("#sort-select", "added");
