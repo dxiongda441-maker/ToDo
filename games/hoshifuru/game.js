@@ -80,6 +80,7 @@
             seen: {},
             todo: { redeemed: [], day: "", today: 0 },
             journal: [],
+            titles: [],
             cleared: false
         };
     }
@@ -607,6 +608,7 @@
         const map = currentMap();
         if (map.kind === "town") {
             await giveTodoSeeds();
+            await announceTitles();
         }
         for (const event of map.events || []) {
             if (event.auto && !(event.once && game.flags[event.once])) {
@@ -790,6 +792,7 @@
             busy = true;
             if (npc) {
                 await talkTo(npc);
+                await announceTitles();
             } else if (tileAt(tx, ty) === "X") {
                 await openChest(tx, ty);
             } else if (tileAt(tx, ty) === "*") {
@@ -798,6 +801,7 @@
                 await searchPot(tx, ty);
             } else if (currentMap().effortTree && currentMap().effortTree.x === tx && currentMap().effortTree.y === ty) {
                 await effortTreeDialog();
+                await announceTitles();
             } else {
                 busy = false;
                 await fieldMenu();
@@ -1198,6 +1202,7 @@
                     note(`${up.name}が ${data.spells[spellId].name}を おぼえた。`);
                 }
             }
+            await announceTitles();
         } else if (result === "empty") {
             await battleLog("まものは みんな にげてしまった。");
             result = "win";
@@ -2333,6 +2338,24 @@
         { name: "こつこつ がんばる ひと", hint: "がんばりのたねを 10 こ うけとる", ok: g => g.todo.redeemed.length >= 10 },
         { name: "がんばりの たいじゅ", hint: "がんばりの木を たいじゅに そだてる", ok: g => g.todo.redeemed.length >= data.effortTree[data.effortTree.length - 1].count }
     ];
+
+    // あたらしく とった しょうごうを 知らせる（game.titles に とった 名前を 残す）
+    async function announceTitles() {
+        const earned = TITLES.filter(title => title.ok(game)).map(title => title.name);
+        if (!Array.isArray(game.titles)) {
+            // しょうごうが 入る前の 冒険の書：いまの 分は だまって 記録する
+            game.titles = earned;
+            return;
+        }
+        for (const name of earned) {
+            if (!game.titles.includes(name)) {
+                game.titles.push(name);
+                note(`しょうごう『${name}』を 手に入れた。`);
+                audio.jingle("item");
+                await say(`しょうごう『${name}』を 手に入れた！`);
+            }
+        }
+    }
 
     function titlesView() {
         const got = TITLES.filter(title => title.ok(game)).length;
