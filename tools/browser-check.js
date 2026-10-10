@@ -183,6 +183,13 @@ async function checkTodo(browser, width) {
     const focusStats = await page.textContent("#focus-stats");
     check(/1 session · 25 min · this task: 1/.test(focusStats) && (await page.textContent("#focus-mode")) === "Short break", `時間が来ると 記録して 休憩になる（${focusStats}）`);
 
+    await page.click("h1");
+    await page.keyboard.press("/");
+    check(await page.evaluate(() => document.activeElement.id === "search-input"), "「/」で 検索欄へ");
+    await page.click("h1");
+    await page.keyboard.press("n");
+    check(await page.evaluate(() => document.activeElement.id === "task-input" && document.activeElement.value === ""), "「n」で 新しいタスクの入力欄へ（n は 入力されない）");
+
     await page.click("#theme-toggle");
     await page.click("#theme-toggle");
     check(await page.evaluate(() => document.body.classList.contains("dark")), "ダーク配色に切り替えられる");

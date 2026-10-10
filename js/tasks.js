@@ -804,7 +804,27 @@ TodoApp.tasks = (() => {
 
         list.addEventListener("keydown", onListKeydown);
         clearCompletedButton.addEventListener("click", clearCompletedTasks);
+        document.addEventListener("keydown", onShortcutKeydown);
         updateFilterButtons();
+    }
+
+    // ショートカット：「/」で検索欄へ、「n」で新しいタスクの入力欄へ（文字を入力中は 何もしない）
+    function onShortcutKeydown(event) {
+        if (event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) {
+            return;
+        }
+        const target = event.target;
+        const typing = target && (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable);
+        if (typing) {
+            return;
+        }
+        if (event.key === "/" && searchInput) {
+            event.preventDefault();
+            searchInput.focus();
+        } else if (event.key === "n" || event.key === "N") {
+            event.preventDefault();
+            input.focus();
+        }
     }
 
     return { init, render: renderTasks, restoreArchived };

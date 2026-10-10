@@ -17,7 +17,7 @@
         </header>
         <form id="todo-form" class="todo-form" autocomplete="off">
             <label class="visually-hidden" for="task-input">Task</label>
-            <input id="task-input" name="task" type="text" placeholder="Add a task (try #tags)" required>
+            <input id="task-input" name="task" type="text" placeholder="Add a task (try #tags)" title="Shortcut: N" required>
             <label class="visually-hidden" for="due-input">Due date (optional)</label>
             <input id="due-input" name="due" type="date" title="Due date (optional)">
             <button type="submit">Add</button>
@@ -30,7 +30,7 @@
                 <button type="button" class="filter-button" data-filter="completed">Completed</button>
             </div>
             <label class="visually-hidden" for="search-input">Search tasks</label>
-            <input id="search-input" class="search-input" type="search" placeholder="Search tasks">
+            <input id="search-input" class="search-input" type="search" placeholder="Search tasks ( / )" title="Shortcut: /">
             <label class="visually-hidden" for="sort-select">Sort tasks</label>
             <select id="sort-select" class="sort-select" title="Sort tasks">
                 <option value="added">My order</option>
