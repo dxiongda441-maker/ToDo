@@ -947,6 +947,7 @@ function createUtsuroiEngine() {
     // 強さの設定。noise は評価に加えるゆらぎ（大きいほど人間らしく間違える）
     const LEVELS = {
         easy: { depth: 1, timeMs: 300, noise: 90, label: "やさしい" },
+        casual: { depth: 2, timeMs: 500, noise: 45, label: "すこし手ごわい" },
         normal: { depth: 3, timeMs: 800, noise: 18, label: "ふつう" },
         hard: { depth: 30, timeMs: 1500, noise: 0, label: "つよい" }
     };
