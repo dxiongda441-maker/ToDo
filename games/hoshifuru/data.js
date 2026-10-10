@@ -145,7 +145,7 @@
         nagareboshibat: { name: "ながれぼしバット", sprite: "bat", palette: "cosmic", hp: 150, atk: 136, def: 56, agi: 64, exp: 150, gold: 80, actions: [["attack", 3], ["windBlade", 1]] },
         meteogolem: { name: "メテオゴーレム", sprite: "golem", palette: "cosmic", hp: 300, atk: 150, def: 80, agi: 18, exp: 220, gold: 110, sleepImmune: true, actions: [["attack", 3], ["quake", 1]] },
         ginganokishi: { name: "ぎんがのきし", sprite: "knight", palette: "star", hp: 240, atk: 156, def: 82, agi: 34, exp: 200, gold: 100, resist: { thunder: 0.7 }, actions: [["attack", 3], ["charge", 1]] },
-        hoshikui: { name: "ほしくい", sprite: "snake", palette: "cosmic", hp: 3000, atk: 116, def: 76, agi: 55, exp: 6000, gold: 3000, boss: true, sleepImmune: true, actionsPerTurn: 2, resist: { light: 0.5 }, actions: [["attack", 3], ["starFall", 2], ["dispel", 1], ["selfHeal", 1]] },
+        hoshikui: { name: "ほしくい", sprite: "dragon", palette: "cosmic", hp: 3000, atk: 116, def: 76, agi: 55, exp: 6000, gold: 3000, boss: true, sleepImmune: true, actionsPerTurn: 2, resist: { light: 0.5 }, actions: [["attack", 3], ["starFall", 2], ["dispel", 1], ["selfHeal", 1]] },
 
         kagenoou2: { name: "かげの王（しんのすがた）", sprite: "king", palette: "true", hp: 2100, atk: 100, def: 64, agi: 48, exp: 0, gold: 0, boss: true, sleepImmune: true, actionsPerTurn: 2, resist: { light: 1.5 }, actions: [["attack", 3], ["darkFlame", 2], ["dispel", 1], ["selfHeal", 1]] }
     };
