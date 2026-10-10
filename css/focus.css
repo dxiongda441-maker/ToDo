@@ -1,0 +1,172 @@
+/* 集中タイマー（ポモドーロ） */
+
+.focus-section {
+    --focus-color: #e11d48;
+    margin-top: 2rem;
+    padding: 1.25rem 1.5rem;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.55);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1.25rem;
+    align-items: center;
+}
+
+body.dark .focus-section {
+    border-color: var(--border-dark);
+    background: rgba(15, 23, 42, 0.45);
+}
+
+.focus-section[data-mode="short"],
+.focus-section[data-mode="long"] {
+    --focus-color: #0f766e;
+}
+
+/* 残り時間の輪（--done が 0 → 1 で 色の部分が増える） */
+.focus-ring {
+    --done: 0;
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    background:
+        radial-gradient(closest-side, #f8fafc 76%, transparent 77%),
+        conic-gradient(var(--focus-color) calc(var(--done) * 360deg), rgba(148, 163, 184, 0.3) 0);
+}
+
+body.dark .focus-ring {
+    background:
+        radial-gradient(closest-side, #1e293b 76%, transparent 77%),
+        conic-gradient(var(--focus-color) calc(var(--done) * 360deg), rgba(148, 163, 184, 0.25) 0);
+}
+
+.focus-body {
+    display: grid;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.focus-body h2 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.focus-time {
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.focus-mode {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--focus-color);
+}
+
+body.dark .focus-mode {
+    filter: brightness(1.4);
+}
+
+.focus-clock {
+    font-size: 2rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+
+.focus-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.focus-button {
+    border: none;
+    border-radius: 999px;
+    padding: 0.45rem 1rem;
+    background: rgba(37, 99, 235, 0.14);
+    color: var(--accent-hover);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.focus-button:hover,
+.focus-button:focus-visible {
+    background: rgba(37, 99, 235, 0.26);
+}
+
+.focus-button.primary {
+    background: var(--focus-color);
+    color: #fff;
+    min-width: 5.5rem;
+}
+
+.focus-button.primary:hover,
+.focus-button.primary:focus-visible {
+    filter: brightness(1.1);
+    background: var(--focus-color);
+}
+
+body.dark .focus-button:not(.primary) {
+    color: #bfdbfe;
+    background: rgba(59, 130, 246, 0.25);
+}
+
+.focus-options {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.4rem 0.6rem;
+    align-items: center;
+    font-size: 0.85rem;
+}
+
+.focus-select {
+    min-width: 0;
+    width: 100%;
+    padding: 0.35rem 0.5rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.9);
+    color: inherit;
+    font: inherit;
+}
+
+body.dark .focus-select {
+    border-color: var(--border-dark);
+    background: rgba(15, 23, 42, 0.8);
+}
+
+.focus-stats {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #475569;
+}
+
+body.dark .focus-stats {
+    color: #cbd5f5;
+}
+
+@media (max-width: 480px) {
+    .focus-section {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        text-align: center;
+    }
+
+    .focus-body {
+        width: 100%;
+    }
+
+    .focus-time,
+    .focus-actions {
+        justify-content: center;
+    }
+
+    .focus-options {
+        text-align: left;
+    }
+}

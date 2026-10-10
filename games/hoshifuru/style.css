@@ -1,0 +1,399 @@
+/* ほしふるクエスト：画面のスタイル */
+
+:root {
+    color-scheme: dark;
+    --win-bg: rgba(0, 0, 0, 0.88);
+    --win-line: #ffffff;
+    --text: #ffffff;
+    --dim: #9aa0b4;
+    --accent: #ffd34d;
+    --danger: #ff6b6b;
+    --heal: #7dffa8;
+    --page: #0b0d1a;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    background: radial-gradient(circle at 50% 0%, #1b2246, var(--page) 60%);
+    color: var(--text);
+    min-height: 100vh;
+    font-family: "DotGothic16", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Meiryo", monospace;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.game {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px 24px;
+}
+
+/* 画面：272×208 の比率のまま、幅いっぱいに広げる */
+.screen {
+    position: relative;
+    width: min(100%, 880px, calc((100vh - 220px) * 272 / 208));
+    min-width: 280px;
+    aspect-ratio: 272 / 208;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 0 0 3px #2b3260, 0 18px 50px rgba(0, 0, 0, 0.6);
+    container-type: inline-size;
+    background: #000;
+    touch-action: none;
+    user-select: none;
+}
+
+.screen.shake {
+    animation: shake 0.28s linear;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translate(0, 0); }
+    20% { transform: translate(-6px, 2px); }
+    40% { transform: translate(5px, -2px); }
+    60% { transform: translate(-4px, 1px); }
+    80% { transform: translate(3px, 0); }
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+.ui {
+    position: absolute;
+    inset: 0;
+    font-size: clamp(11px, 3.5cqw, 26px);
+    line-height: 1.45;
+    pointer-events: none;
+}
+
+.fade {
+    position: absolute;
+    inset: 0;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.fade.on {
+    opacity: 1;
+}
+
+.fade.white {
+    background: #fff;
+}
+
+/* ---------- ウィンドウ ---------- */
+.win {
+    position: absolute;
+    background: var(--win-bg);
+    border: 0.18em solid var(--win-line);
+    border-radius: 0.45em;
+    box-shadow: 0 0 0 0.12em #000, inset 0 0 0 0.08em #000;
+    padding: 0.45em 0.7em;
+    color: var(--text);
+    pointer-events: auto;
+}
+
+/* 全体を おおう ウィンドウは 後ろが すけないように */
+.win.records,
+.win.book,
+.win.status-detail {
+    background: rgba(0, 0, 0, 0.97);
+}
+
+.win-title {
+    position: absolute;
+    top: -0.8em;
+    left: 0.8em;
+    padding: 0 0.3em;
+    background: #000;
+    font-size: 0.8em;
+}
+
+.message {
+    background: rgba(0, 0, 0, 0.96); /* 下の ウィンドウの 文字が すけて 読みにくく ならないように */
+    left: 3%;
+    right: 3%;
+    bottom: 3%;
+    min-height: 32%;
+    white-space: pre-wrap;
+}
+
+.message .more {
+    position: absolute;
+    right: 0.6em;
+    bottom: 0.2em;
+    animation: blink 0.8s steps(2, start) infinite;
+}
+
+@keyframes blink {
+    to { visibility: hidden; }
+}
+
+.menu {
+    display: grid;
+    gap: 0.05em 1.2em;
+}
+
+.menu-item {
+    position: relative;
+    padding-left: 1.1em;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.menu-item.disabled {
+    color: var(--dim);
+}
+
+.menu-item.current::before {
+    content: "▶";
+    position: absolute;
+    left: 0;
+    animation: blink 0.8s steps(2, start) infinite;
+}
+
+.menu-item .right {
+    float: right;
+    margin-left: 1em;
+}
+
+.menu-scroll {
+    max-height: 100%;
+    overflow: hidden;
+}
+
+.info {
+    font-size: 0.82em;
+    color: #dfe3f5;
+}
+
+/* スマホの 小さな 画面では 小さい字を 少し大きく */
+@container (max-width: 420px) {
+    .info {
+        font-size: 0.92em;
+    }
+}
+
+.status-row {
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 1), 5.6em);
+    gap: 0.8em;
+}
+
+.member {
+    line-height: 1.3;
+}
+
+.member .name {
+    border-bottom: 0.08em solid #fff;
+    margin-bottom: 0.15em;
+    white-space: nowrap;
+}
+
+.member.low {
+    color: var(--accent);
+}
+
+.member.dead {
+    color: var(--danger);
+}
+
+.member.poison .name::after {
+    content: " ど";
+    color: #b388ff;
+}
+
+.member.hit {
+    animation: hit 0.3s linear;
+}
+
+@keyframes hit {
+    50% { color: var(--danger); }
+}
+
+.growth .info {
+    white-space: pre-wrap;
+}
+
+.growth canvas {
+    display: block;
+    width: 100%;
+    height: 3em;
+    margin-top: 0.2em;
+    border-bottom: 0.08em solid rgba(255, 255, 255, 0.3);
+}
+
+.stat-table {
+    border-collapse: collapse;
+}
+
+.stat-table td {
+    padding: 0 0.5em 0 0;
+    white-space: nowrap;
+}
+
+.stat-table td.num {
+    text-align: right;
+}
+
+.up {
+    color: var(--heal);
+}
+
+.down {
+    color: var(--danger);
+}
+
+.title-screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 17%; /* 下に メニューと 冒険の書の 中身を ならべるので 上に よせる */
+    gap: 0.6em;
+    text-align: center;
+    pointer-events: none;
+}
+
+.title-logo {
+    font-size: 2.4em;
+    letter-spacing: 0.08em;
+    color: #fff;
+    text-shadow: 0 0 0.3em #6fb0ff, 0.08em 0.08em 0 #2a3a8a;
+}
+
+.title-sub {
+    color: #cfd8ff;
+    font-size: 0.85em;
+}
+
+.name-input {
+    font: inherit;
+    font-size: 1em;
+    width: 8em;
+    padding: 0.2em 0.4em;
+    background: #000;
+    color: #fff;
+    border: 0.12em solid #fff;
+    border-radius: 0.3em;
+}
+
+.credits {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 0.4em;
+    text-shadow: 0 0 0.3em #000;
+    pointer-events: none;
+}
+
+/* ---------- スマホのボタン ---------- */
+.pad {
+    display: none;
+    width: min(100%, 880px);
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 8px;
+    user-select: none;
+    touch-action: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .pad {
+        display: flex;
+    }
+
+    .help {
+        display: none;
+    }
+}
+
+.pad.show {
+    display: flex;
+}
+
+.dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 56px);
+    grid-template-rows: repeat(3, 56px);
+}
+
+.pad-btn {
+    border: 2px solid #5a6390;
+    background: #1d2240;
+    color: #fff;
+    font: inherit;
+    font-size: 20px;
+    border-radius: 12px;
+    touch-action: none;
+}
+
+.pad-btn:active,
+.pad-btn.pressed {
+    background: #3a4380;
+}
+
+.dpad .up { grid-column: 2; grid-row: 1; }
+.dpad .left { grid-column: 1; grid-row: 2; }
+.dpad .right { grid-column: 3; grid-row: 2; }
+.dpad .down { grid-column: 2; grid-row: 3; }
+
+.ab {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.ab .pad-btn {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    font-size: 22px;
+}
+
+.ab .a {
+    background: #8a2f2f;
+    border-color: #d06060;
+    margin-top: -36px;
+}
+
+.help,
+.links {
+    margin: 0;
+    max-width: 880px;
+    color: #b8bfdc;
+    font-size: 13px;
+    text-align: center;
+}
+
+.links a {
+    color: #9cc8ff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .screen.shake,
+    .member.hit,
+    .menu-item.current::before,
+    .message .more {
+        animation: none;
+    }
+}
