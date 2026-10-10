@@ -836,7 +836,7 @@
             await scholarDialog();
             return;
         }
-        const entry = (npc.talk || []).find(t => (!t.if || game.flags[t.if]) && (!t.unless || !game.flags[t.unless]));
+        const entry = (npc.talk || []).find(t => (!t.if || game.flags[t.if]) && (!t.unless || !game.flags[t.unless]) && (!t.ifItem || R.itemCount(game.bag, t.ifItem) > 0));
         if (!entry) {
             return;
         }
@@ -1053,6 +1053,8 @@
                 closeMessage();
                 await warpTo(arg, extra[0], extra[1], extra[2] || "up");
                 return true;
+            } else if (name === "take") {
+                R.removeItem(game.bag, arg);
             } else if (name === "give") {
                 await say(R.addItem(game.bag, arg) ? `${data.items[arg].name}を 手に入れた！` : `${data.items[arg].name}を もらったが、どうぐぶくろが いっぱいで もてなかった…`);
             } else if (name === "equip") {
