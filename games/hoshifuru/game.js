@@ -2104,7 +2104,9 @@
                 <tr><td>けいけんち</td><td class="num">${m.exp}</td><td>つぎまで</td><td class="num">${next}</td></tr>
             </table>
             <div class="info">そうび：${["weapon", "armor", "shield"].map(s => (m.equip[s] ? data.equipment[m.equip[s]].name : "—")).join("・")}</div>
-            <div class="info">じゅもん：${m.spells.map(id => data.spells[id].name).join("・") || "なし"}</div>`;
+            <div class="info">じゅもん：${m.spells.map(id => data.spells[id].name).join("・") || "なし"}</div>
+            <div class="growth"><canvas width="180" height="56"></canvas><div class="info"></div></div>`;
+        drawGrowth(el.querySelector(".growth canvas"), el.querySelector(".growth .info"), m);
         await new Promise(resolve => {
             const pop = pushLayer({
                 onKey(action) {
@@ -2116,6 +2118,36 @@
             });
         });
         el.remove();
+    }
+
+    // せいちょうの グラフ：職業の HP の のびかた（Lv 1〜30）に、いまの 位置を しるす。
+    // 実線は もう 通ってきた ところ、点線は これから
+    function drawGrowth(canvasEl, infoEl, member) {
+        // 見た目の 大きさに あわせて 描く（字や 線が ゆがまないように）
+        const W = canvasEl.width = Math.max(120, canvasEl.clientWidth);
+        const H = canvasEl.height = Math.max(30, canvasEl.clientHeight);
+        const g2 = canvasEl.getContext("2d");
+        const cls = data.classes[member.cls];
+        const top = cls.end.hp;
+        const x = level => 6 + (level - 1) / (R.MAX_LEVEL - 1) * (W - 12);
+        const y = value => H - 4 - (value / top) * (H - 10);
+        g2.setLineDash([]);
+        for (let level = 1; level < R.MAX_LEVEL; level += 1) {
+            const reached = level < member.level;
+            g2.strokeStyle = reached ? "#7dffa8" : "rgba(255, 255, 255, 0.35)";
+            g2.lineWidth = reached ? 3 : 1;
+            g2.setLineDash(reached ? [] : [3, 3]);
+            g2.beginPath();
+            g2.moveTo(x(level), y(R.growthAt(member.cls, "hp", level)));
+            g2.lineTo(x(level + 1), y(R.growthAt(member.cls, "hp", level + 1)));
+            g2.stroke();
+        }
+        g2.fillStyle = "#ffd34d";
+        g2.beginPath();
+        g2.arc(x(member.level), y(member.base.hp), 4, 0, Math.PI * 2);
+        g2.fill();
+        const times = stat => (member.base[stat] / cls.start[stat]).toFixed(1);
+        infoEl.textContent = `せいちょう（HP のびかた。右はし が Lv ${R.MAX_LEVEL}）\nLv 1 から HP ${times("hp")}ばい・ちから ${times("str")}ばい`;
     }
 
     function formatTime(ms) {
