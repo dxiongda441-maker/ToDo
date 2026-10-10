@@ -199,9 +199,14 @@
         return targets;
     }
 
+    // 指した手の動き（駒が滑る・床がめくれる）は、その局面を初めて描くときだけ見せる
+    let animatedPosition = null;
+
     function render() {
         const position = current();
         const last = position.lastMove;
+        const animate = Boolean(last) && animatedPosition !== position;
+        animatedPosition = position;
         const selectedTargets = game.selected === null
             ? new Set()
             : new Set(E.movesFrom(position.board, position.tiles, game.selected));
@@ -224,9 +229,13 @@
             const tile = position.tiles[index];
             const piece = position.board[index];
             cell.dataset.tile = String(tile);
-            cell.className = "cell";
+            const sliding = cell.classList.contains("sliding");
+            cell.className = sliding ? "cell sliding" : "cell";
             if (last && index === last.from) {
-                cell.classList.add("last-from", "changed");
+                cell.classList.add("last-from");
+                if (animate) {
+                    cell.classList.add("changed");
+                }
             }
             if (last && index === last.to) {
                 cell.classList.add("last-to");
@@ -262,14 +271,17 @@
             if (piece !== 0) {
                 const side = piece > 0 ? BLACK : WHITE;
                 const king = Math.abs(piece) === KING;
-                const arrived = last && index === last.to ? " arrived" : "";
-                html += `<span class="piece piece--${side === BLACK ? "black" : "white"}${king ? " piece--king" : ""}${arrived}" aria-hidden="true">${king ? "王" : ""}</span>`;
+                html += `<span class="piece piece--${side === BLACK ? "black" : "white"}${king ? " piece--king" : ""}" aria-hidden="true">${king ? "王" : ""}</span>`;
                 pieceText = `、${SIDE_NAME[side]}の${king ? "王" : "石"}`;
                 if (inDanger.has(index)) {
                     pieceText += "（取られる危険あり）";
                 }
             }
-            cell.innerHTML = html;
+            // 中身が同じなら書き換えない（滑っている途中の駒を消さないため）
+            if (cell.dataset.html !== html) {
+                cell.innerHTML = html;
+                cell.dataset.html = html;
+            }
 
             let label = `${squareName(index)}、床「${info.kanji}」${pieceText}`;
             if (selectedTargets.has(index)) {
@@ -286,6 +298,9 @@
             cell.setAttribute("aria-label", label);
         });
 
+        if (animate) {
+            slidePiece(last);
+        }
         renderCoords();
         renderStrips();
         renderTurn();
@@ -301,6 +316,33 @@
         // レッスンは「やり直す」で戻る（待ったで盤だけ戻すと、ステップとずれる）
         undoButton.disabled = game.history.length <= 1 || game.thinking || game.mode === "replay" || game.mode === "lesson";
         hintButton.disabled = !isHumanTurn() || game.thinking || game.mode === "lesson";
+    }
+
+    // 動いた駒を、元のマスの位置から今のマスへ滑らせる
+    function slidePiece(move) {
+        if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            return;
+        }
+        const fromCell = cells[indexToView(move.from)];
+        const toCell = cells[indexToView(move.to)];
+        const piece = toCell && toCell.querySelector(".piece");
+        if (!fromCell || !piece) {
+            return;
+        }
+        const fromRect = fromCell.getBoundingClientRect();
+        const toRect = toCell.getBoundingClientRect();
+        const dx = fromRect.left - toRect.left;
+        const dy = fromRect.top - toRect.top;
+        toCell.classList.add("sliding");
+        piece.style.transition = "none";
+        piece.style.transform = `translate(${dx}px, ${dy}px)`;
+        piece.getBoundingClientRect(); // いったん元の位置で描いてから動かす
+        piece.style.transition = "transform 0.28s cubic-bezier(0.2, 0.7, 0.3, 1)";
+        piece.style.transform = "";
+        piece.addEventListener("transitionend", () => {
+            toCell.classList.remove("sliding");
+            piece.style.transition = "";
+        }, { once: true });
     }
 
     function renderCoords() {
@@ -358,8 +400,12 @@
         } else if (game.mode === "puzzle") {
             status = `あなたの番（${SIDE_NAME[game.human]}）。あと ${puzzleMovesLeft()} 手以内に勝ってください。`;
         } else if (game.mode === "cpu") {
+            const move = position.lastMove;
+            const cpuMove = move && position.turn === game.human
+                ? `CPU：${squareName(move.from)}${move.captured !== 0 ? "×" : "→"}${squareName(move.to)}。`
+                : "";
             status = game.selected === null
-                ? `あなたの番です（${SIDE_NAME[game.human]}）。動かす駒を選んでください。`
+                ? `${cpuMove}あなたの番です（${SIDE_NAME[game.human]}）。動かす駒を選んでください。`
                 : "動かす先を選んでください（もう一度押すと取り消し）。";
         } else {
             status = `${SIDE_NAME[side]}（${playerLabel(side)}）の番です。`;

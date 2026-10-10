@@ -390,13 +390,10 @@ input {
     transform: translateY(-3px) scale(1.06);
 }
 
-.piece.arrived {
-    animation: piece-land 0.3s ease;
-}
-
-@keyframes piece-land {
-    0% { transform: scale(1.25); }
-    100% { transform: scale(1); }
+/* 滑ってくる駒が、ほかのマスの下に隠れないように */
+.cell.sliding {
+    overflow: visible;
+    z-index: 5;
 }
 
 /* 取られそうな自分の駒 / 取れる相手の駒 */
