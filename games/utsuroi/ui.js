@@ -290,8 +290,9 @@
         renderPuzzleCard();
         renderReplayCard();
         renderLessonCard();
-        undoButton.disabled = game.history.length <= 1 || game.thinking || game.mode === "replay";
-        hintButton.disabled = !isHumanTurn() || game.thinking;
+        // レッスンは「やり直す」で戻る（待ったで盤だけ戻すと、ステップとずれる）
+        undoButton.disabled = game.history.length <= 1 || game.thinking || game.mode === "replay" || game.mode === "lesson";
+        hintButton.disabled = !isHumanTurn() || game.thinking || game.mode === "lesson";
     }
 
     function renderCoords() {
@@ -1510,7 +1511,7 @@ self.onmessage = event => {
     }
 
     function undo() {
-        if (game.history.length <= 1) {
+        if (game.history.length <= 1 || game.mode === "lesson" || game.mode === "replay") {
             return;
         }
         game.token += 1;
@@ -1556,7 +1557,7 @@ self.onmessage = event => {
     }
 
     async function showHint() {
-        if (!isHumanTurn() || game.thinking) {
+        if (!isHumanTurn() || game.thinking || game.mode === "lesson") {
             return;
         }
         const token = game.token;
