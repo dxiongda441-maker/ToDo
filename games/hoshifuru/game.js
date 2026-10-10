@@ -1121,7 +1121,9 @@
     async function startBattle(enemyIds, options) {
         busy = true;
         held.clear();
-        const battle = R.createBattle(game.party, enemyIds, { canFlee: !options.boss });
+        // つよくて はじめから では 物語の 魔物が 強くなる（とうぎじょうと 星の遺跡は もともと 強いので そのまま）
+        const postGame = options.arena || /^ruins/.test(game.map);
+        const battle = R.createBattle(game.party, enemyIds, { canFlee: !options.boss, scale: postGame ? 1 : R.lapScale(game.plus) });
         game.stats.battles += 1;
         enemyIds.forEach(id => {
             game.seen[id] = true;

@@ -417,6 +417,20 @@ test("どくで たおれると ねむりや 強化も なくなる", () => {
     assert.deepEqual(battle.allyState[0], { atkUp: 0, defUp: 0, sleep: 0, defending: false });
 });
 
+test("つよくて はじめから：魔物の HP・攻撃・ほうびが 倍率で ふえる", () => {
+    const rng = seededRng(6);
+    assert.equal(R.lapScale(0), 1);
+    assert.equal(R.lapScale(1), 1.25);
+    assert.equal(R.lapScale(5), 1.5);
+    const hero = R.createMember("hero", "ユウ", 10, rng);
+    const normal = R.createBattle([hero], ["purubesu"]);
+    const strong = R.createBattle([hero], ["purubesu"], { scale: 1.5 });
+    assert.equal(strong.enemies[0].maxHp, Math.round(normal.enemies[0].maxHp * 1.5));
+    strong.defeated = ["purubesu"];
+    normal.defeated = ["purubesu"];
+    assert.equal(R.battleRewards(strong, rng).exp, R.battleRewards(normal, rng).exp * 1.5);
+});
+
 console.log("[音]");
 
 test("MML：音の高さと長さ", () => {

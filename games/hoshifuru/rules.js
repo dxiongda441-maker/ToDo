@@ -270,6 +270,7 @@
     const LETTERS = "ABCDEFGH";
 
     function createBattle(party, enemyIds, options = {}) {
+        const scale = options.scale > 0 ? options.scale : 1;
         const counts = {};
         enemyIds.forEach(id => {
             counts[id] = (counts[id] || 0) + 1;
@@ -278,11 +279,12 @@
         const enemies = enemyIds.map(id => {
             const def = data.enemies[id];
             seen[id] = (seen[id] || 0) + 1;
+            const hp = Math.round(def.hp * scale);
             return {
                 id,
                 name: counts[id] > 1 ? `${def.name}${LETTERS[seen[id] - 1]}` : def.name,
-                hp: def.hp,
-                maxHp: def.hp,
+                hp,
+                maxHp: hp,
                 sleep: 0,
                 gone: false // 倒れた・にげた
             };
@@ -293,6 +295,7 @@
             enemies,
             canFlee: options.canFlee !== false && !enemyIds.some(id => data.enemies[id].boss),
             fleeTries: 0,
+            scale,
             turn: 0,
             over: false,
             result: null,
@@ -303,8 +306,18 @@
     const aliveEnemies = battle => battle.enemies.filter(e => !e.gone && e.hp > 0);
     const aliveAllies = battle => battle.party.map((m, i) => i).filter(i => battle.party[i].hp > 0);
 
-    function enemyAttack(enemy) {
-        return data.enemies[enemy.id].atk;
+    // scale：つよくて はじめから（2 しゅうめ 以降）で 魔物が 強くなる 倍率
+    function enemyAttack(battle, enemy) {
+        return Math.round(data.enemies[enemy.id].atk * battle.scale);
+    }
+
+    // 何しゅうめかで 魔物の 強さの 倍率（1 しゅうめ 1、2 しゅうめ 1.25、3 しゅうめ 以降 1.5）
+    function lapScale(plus) {
+        return Math.min(1.5, 1 + 0.25 * (plus || 0));
+    }
+
+    function enemyDefense(battle, enemy) {
+        return Math.round(data.enemies[enemy.id].def * (1 + (battle.scale - 1) / 2));
     }
 
     function allyAttack(battle, index) {
@@ -521,7 +534,7 @@
         }
         const action = enemyChooseAction(battle, enemyIndex, rng);
         const name = enemy.name;
-        const atk = enemyAttack(enemy);
+        const atk = enemyAttack(battle, enemy);
 
         if (action === "attack") {
             const target = pickAllyTarget(battle, rng);
@@ -538,7 +551,7 @@
             events.push({ type: "enemyAct", index: enemyIndex, text: `${name}は ${spell.name}を となえた！` });
             const targets = spell.target === "enemies" ? aliveAllies(battle) : [pickAllyTarget(battle, rng)];
             targets.forEach(i => {
-                damageAlly(battle, i, Math.round(randInt(rng, spell.power[0], spell.power[1]) * 0.9), events);
+                damageAlly(battle, i, Math.round(randInt(rng, spell.power[0], spell.power[1]) * 0.9 * battle.scale), events);
             });
             return;
         }
@@ -570,7 +583,7 @@
             }
         } else if (skill.kind === "group") {
             aliveAllies(battle).forEach(i => {
-                damageAlly(battle, i, randInt(rng, skill.power[0], skill.power[1]), events);
+                damageAlly(battle, i, Math.round(randInt(rng, skill.power[0], skill.power[1]) * battle.scale), events);
             });
         } else if (skill.kind === "healAlly" || skill.kind === "selfHeal") {
             const candidates = skill.kind === "selfHeal"
@@ -578,7 +591,7 @@
                 : battle.enemies.map((e, i) => i).filter(i => !battle.enemies[i].gone && battle.enemies[i].hp > 0);
             const target = candidates.reduce((best, i) => (battle.enemies[i].hp / battle.enemies[i].maxHp < battle.enemies[best].hp / battle.enemies[best].maxHp ? i : best), candidates[0]);
             const foe = battle.enemies[target];
-            const amount = Math.min(foe.maxHp - foe.hp, randInt(rng, skill.power[0], skill.power[1]));
+            const amount = Math.min(foe.maxHp - foe.hp, Math.round(randInt(rng, skill.power[0], skill.power[1]) * battle.scale));
             foe.hp += amount;
             events.push({ type: "enemyHeal", index: target, amount, text: `${foe.name}の きずが ${amount} かいふくした！` });
         } else if (skill.kind === "dispel") {
@@ -627,7 +640,7 @@
                 events.push({ type: "text", text: `${enemy.name}は ひらりと みをかわした！` });
                 return;
             }
-            damageEnemy(battle, target, physicalDamage(allyAttack(battle, index), enemyDef.def, rng), events, rng);
+            damageEnemy(battle, target, physicalDamage(allyAttack(battle, index), enemyDefense(battle, enemy), rng), events, rng);
         } else if (command.type === "spell") {
             castAllySpell(battle, index, command.spell, command.target, rng, events);
         } else if (command.type === "item") {
@@ -762,8 +775,8 @@
         let gold = 0;
         battle.defeated.forEach(id => {
             const def = data.enemies[id];
-            exp += def.exp;
-            gold += def.gold;
+            exp += def.exp * battle.scale;
+            gold += def.gold * battle.scale;
         });
         exp = Math.round(exp * rate);
         gold = Math.round(gold * rate);
@@ -887,6 +900,7 @@
         revive,
         rollEncounter,
         overwhelms,
+        lapScale,
         TACTICS,
         createBattle,
         resolveRound,
