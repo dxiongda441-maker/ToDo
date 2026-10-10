@@ -1033,6 +1033,30 @@ function createUtsuroiEngine() {
         return Object.assign(decodeMove(best.move), { score: best.score, outcome: outcomeFromScore(best.score) });
     }
 
+    // 対局の各局面の形勢を、先手（黒）から見た点数の列で返す（形勢グラフ用）。
+    // 決着した局面と読み切れた局面は ±LINE_LIMIT にそろえる
+    const LINE_LIMIT = 1000;
+    function evaluateLine(positions, depth = 3) {
+        ensureTable();
+        return positions.map(position => {
+            if (position.result) {
+                return position.result.winner * LINE_LIMIT;
+            }
+            clearTable();
+            const searcher = createSearcher(position, {});
+            const best = searcher.searchBest(depth);
+            let score = best.score;
+            if (Math.abs(score) > WIN_THRESHOLD) {
+                score = score > 0 ? LINE_LIMIT : -LINE_LIMIT;
+            } else {
+                // 手番側に付く小さな加点を除く（除かないと 1 手ごとにグラフがぎざぎざになる）
+                score -= DEFAULT_WEIGHTS.tempo;
+            }
+            score = Math.max(-LINE_LIMIT, Math.min(LINE_LIMIT, score));
+            return position.turn === BLACK ? score : -score;
+        });
+    }
+
     // ---------- 詰め問題の局面を短い文字列にする ----------
     const PIECE_CHARS = { 0: ".", 1: "b", 2: "B", [-1]: "w", [-2]: "W" };
     const CHAR_PIECES = { ".": 0, b: 1, B: 2, w: -1, W: -2 };
@@ -1125,6 +1149,8 @@ function createUtsuroiEngine() {
         outcomeFromScore,
         winningMoves,
         analyzePosition,
+        evaluateLine,
+        LINE_LIMIT,
         encodePosition,
         decodePosition,
         MAX_HANDICAP

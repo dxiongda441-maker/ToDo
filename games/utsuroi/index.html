@@ -57,6 +57,20 @@
                         <button type="button" class="action" data-replay="last" aria-label="最後へ">⏭</button>
                     </div>
                     <p class="muted small">キーボードの ← → でも動かせます。</p>
+                    <figure class="eval-graph" id="eval-graph">
+                        <figcaption class="eval-title">形勢グラフ <span class="muted small">（CPU の見立て。押すとその手へ）</span></figcaption>
+                        <div class="eval-plot">
+                            <span class="eval-label eval-label--top"><span class="eval-key eval-key--black"></span>黒が有利</span>
+                            <svg id="eval-svg" class="eval-svg" viewBox="0 0 300 120" preserveAspectRatio="none" role="img" aria-label="形勢グラフ"></svg>
+                            <span class="eval-label eval-label--bottom"><span class="eval-key eval-key--white"></span>白が有利</span>
+                            <div id="eval-tooltip" class="eval-tooltip" hidden></div>
+                        </div>
+                        <p id="eval-status" class="muted small"></p>
+                        <details class="eval-table-wrap">
+                            <summary>数値で見る</summary>
+                            <ol id="eval-table" class="eval-table" start="0"></ol>
+                        </details>
+                    </figure>
                     <button type="button" id="replay-exit" class="action">対局に戻る</button>
                 </section>
 

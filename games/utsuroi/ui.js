@@ -258,8 +258,10 @@
             if (selectedTargets.has(index)) {
                 label += piece !== 0 ? "。ここへ動いて取れます" : "。ここへ動けます";
             }
-            if (index === throneBlack || index === throneWhite) {
-                label += "。玉座";
+            if (index === throneBlack) {
+                label += "。黒の玉座（白の王が着くと白の勝ち）";
+            } else if (index === throneWhite) {
+                label += "。白の玉座（黒の王が着くと黒の勝ち）";
             }
             cell.setAttribute("aria-label", label);
         });
@@ -618,6 +620,8 @@ self.onmessage = event => {
     let result = null;
     if (data.kind === "move") {
         result = engine.chooseMove(data.position, data.options);
+    } else if (data.kind === "line") {
+        result = engine.evaluateLine(data.position, data.options.depth);
     } else if (data.kind === "analyze") {
         result = engine.analyzePosition(data.position, data.options.depth);
     } else if (data.kind === "swap") {
@@ -649,6 +653,9 @@ self.onmessage = event => {
     function computeHere(kind, position, options) {
         if (kind === "analyze") {
             return E.analyzePosition(position, options.depth);
+        }
+        if (kind === "line") {
+            return E.evaluateLine(position, options.depth);
         }
         return kind === "move" ? E.chooseMove(position, options) : E.shouldSwap(position, options);
     }
@@ -798,7 +805,7 @@ self.onmessage = event => {
         game.token += 1;
         game.mode = "replay";
         game.puzzle = null;
-        game.replay = { positions, index: index === undefined ? positions.length - 1 : index };
+        game.replay = { positions, index: index === undefined ? positions.length - 1 : index, evals: null };
         game.selected = null;
         game.hint = null;
         game.thinking = false;
@@ -806,6 +813,148 @@ self.onmessage = event => {
         game.flipped = false;
         game.handicap = positions[0].handicap || null;
         showReplayStep();
+        loadEvalLine();
+    }
+
+    // ---------- 形勢グラフ（再生中だけ） ----------
+    const GRAPH_WIDTH = 300;
+    const GRAPH_HEIGHT = 120;
+    const GRAPH_MID = GRAPH_HEIGHT / 2;
+    const evalSvg = $("#eval-svg");
+    const evalTooltip = $("#eval-tooltip");
+    const evalStatus = $("#eval-status");
+    const evalTable = $("#eval-table");
+    const SVG_NS = "http://www.w3.org/2000/svg";
+
+    // 点数をグラフの高さに。大きな差は tanh で頭打ちにして、互角付近の動きを見やすくする
+    const evalToY = value => GRAPH_MID - Math.tanh(value / 250) * (GRAPH_MID - 6);
+    const indexToX = (index, count) => (count <= 1 ? GRAPH_WIDTH / 2 : (index / (count - 1)) * GRAPH_WIDTH);
+
+    function describeEval(value) {
+        const side = value > 0 ? "黒" : "白";
+        const size = Math.abs(value);
+        if (size >= E.LINE_LIMIT) {
+            return `${side}の勝ち`;
+        }
+        if (size < 40) {
+            return "互角";
+        }
+        if (size < 150) {
+            return `${side}がやや有利`;
+        }
+        if (size < 400) {
+            return `${side}が有利`;
+        }
+        return `${side}が優勢`;
+    }
+
+    const signed = value => (Math.abs(value) >= E.LINE_LIMIT ? (value > 0 ? "+勝" : "−勝") : `${value > 0 ? "+" : ""}${value}`);
+
+    async function loadEvalLine() {
+        const replay = game.replay;
+        const token = game.token;
+        evalStatus.textContent = "形勢を計算しています…";
+        renderEvalGraph();
+        const values = await askAi("line", replay.positions, { depth: 4 });
+        if (token !== game.token || game.replay !== replay || !Array.isArray(values)) {
+            return;
+        }
+        replay.evals = values;
+        evalStatus.textContent = "";
+        evalTable.innerHTML = "";
+        values.forEach((value, i) => {
+            const item = document.createElement("li");
+            item.textContent = `${describeEval(value)}（${signed(value)}）`;
+            item.setAttribute("aria-label", `${i} 手目：${describeEval(value)}`);
+            evalTable.appendChild(item);
+        });
+        renderEvalGraph();
+    }
+
+    function svgElement(name, attributes) {
+        const element = document.createElementNS(SVG_NS, name);
+        Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, String(value)));
+        return element;
+    }
+
+    function renderEvalGraph() {
+        const plot = evalSvg.parentElement;
+        const oldMarker = plot.querySelector(".eval-marker");
+        if (oldMarker) {
+            oldMarker.remove();
+        }
+        evalSvg.innerHTML = "";
+        evalSvg.appendChild(svgElement("line", { class: "eval-zero", x1: 0, x2: GRAPH_WIDTH, y1: GRAPH_MID, y2: GRAPH_MID }));
+        if (game.mode !== "replay" || !game.replay.evals) {
+            return;
+        }
+        const values = game.replay.evals;
+        const points = values.map((value, i) => `${indexToX(i, values.length).toFixed(2)},${evalToY(value).toFixed(2)}`);
+
+        const defs = svgElement("defs", {});
+        const clipBlack = svgElement("clipPath", { id: "eval-clip-black" });
+        clipBlack.appendChild(svgElement("rect", { x: 0, y: 0, width: GRAPH_WIDTH, height: GRAPH_MID }));
+        const clipWhite = svgElement("clipPath", { id: "eval-clip-white" });
+        clipWhite.appendChild(svgElement("rect", { x: 0, y: GRAPH_MID, width: GRAPH_WIDTH, height: GRAPH_MID }));
+        defs.append(clipBlack, clipWhite);
+        evalSvg.appendChild(defs);
+
+        const area = `M0,${GRAPH_MID} L${points.join(" L")} L${GRAPH_WIDTH},${GRAPH_MID} Z`;
+        evalSvg.appendChild(svgElement("path", { class: "eval-area--black", d: area, "clip-path": "url(#eval-clip-black)" }));
+        evalSvg.appendChild(svgElement("path", { class: "eval-area--white", d: area, "clip-path": "url(#eval-clip-white)" }));
+        evalSvg.appendChild(svgElement("line", { class: "eval-zero", x1: 0, x2: GRAPH_WIDTH, y1: GRAPH_MID, y2: GRAPH_MID }));
+        evalSvg.appendChild(svgElement("polyline", { class: "eval-line", points: points.join(" ") }));
+        const cross = svgElement("line", { class: "eval-cross", x1: 0, x2: 0, y1: 0, y2: GRAPH_HEIGHT, visibility: "hidden" });
+        cross.id = "eval-cross";
+        evalSvg.appendChild(cross);
+
+        // 今表示している手の位置に点（丸がつぶれないよう、SVG の外に重ねる）
+        const index = game.replay.index;
+        const marker = document.createElement("span");
+        marker.className = "eval-marker";
+        marker.style.left = `${(indexToX(index, values.length) / GRAPH_WIDTH) * 100}%`;
+        marker.style.top = `calc(18px + ${(evalToY(values[index]) / GRAPH_HEIGHT) * 120}px)`;
+        plot.appendChild(marker);
+
+        evalSvg.setAttribute("aria-label", `形勢グラフ。今の ${index} 手目は${describeEval(values[index])}`);
+        Array.from(evalTable.children).forEach((item, i) => item.classList.toggle("current", i === index));
+    }
+
+    function graphIndexAt(event) {
+        const values = game.replay && game.replay.evals;
+        if (!values) {
+            return null;
+        }
+        const rect = evalSvg.getBoundingClientRect();
+        const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+        return Math.round(ratio * (values.length - 1));
+    }
+
+    function onGraphHover(event) {
+        const index = graphIndexAt(event);
+        const cross = $("#eval-cross");
+        if (index === null || !cross) {
+            return;
+        }
+        const values = game.replay.evals;
+        const x = indexToX(index, values.length);
+        cross.setAttribute("x1", x);
+        cross.setAttribute("x2", x);
+        cross.setAttribute("visibility", "visible");
+        evalTooltip.innerHTML = "";
+        const strong = document.createElement("strong");
+        strong.textContent = signed(values[index]);
+        evalTooltip.append(strong, ` ${index} 手目・${describeEval(values[index])}`);
+        evalTooltip.style.left = `${Math.min(80, Math.max(20, (x / GRAPH_WIDTH) * 100))}%`;
+        evalTooltip.hidden = false;
+    }
+
+    function onGraphLeave() {
+        const cross = $("#eval-cross");
+        if (cross) {
+            cross.setAttribute("visibility", "hidden");
+        }
+        evalTooltip.hidden = true;
     }
 
     function showReplayStep() {
@@ -835,6 +984,7 @@ self.onmessage = event => {
         card.querySelector('[data-replay="prev"]').disabled = replay.index === 0;
         card.querySelector('[data-replay="next"]').disabled = replay.index === total;
         card.querySelector('[data-replay="last"]').disabled = replay.index === total;
+        renderEvalGraph();
     }
 
     function stepReplay(action) {
@@ -1395,6 +1545,16 @@ self.onmessage = event => {
             showReplayStep();
         });
         $("#replay-exit").addEventListener("click", resumeSavedOrNew);
+        evalSvg.addEventListener("pointermove", onGraphHover);
+        evalSvg.addEventListener("pointerleave", onGraphLeave);
+        evalSvg.addEventListener("click", event => {
+            const index = graphIndexAt(event);
+            if (index !== null) {
+                game.replay.index = index;
+                showReplayStep();
+                onGraphHover(event);
+            }
+        });
         moveLogEl.addEventListener("click", event => {
             const item = event.target.closest("li[data-step]");
             if (item && game.mode === "replay") {

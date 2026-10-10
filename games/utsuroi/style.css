@@ -2,6 +2,8 @@
 
 :root {
     color-scheme: light dark;
+    --eval-black: #2a78d6;
+    --eval-white: #d03b3b;
     --bg: #f4efe4;
     --bg-accent: #ebe2cf;
     --surface: #fffdf8;
@@ -65,6 +67,8 @@
         --glyph-run: #ffab8f;
 
         --last-move: rgba(250, 204, 21, 0.3);
+        --eval-black: #3987e5;
+        --eval-white: #e06666;
         --target: rgba(147, 197, 253, 0.9);
         --danger: #ff7a66;
         --shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
@@ -873,6 +877,143 @@ input {
 .replay-controls .action {
     min-width: 52px;
     font-size: 1.05rem;
+}
+
+/* 形勢グラフ：上＝黒が有利（青のうすい面）、下＝白が有利（赤のうすい面）。線は 1 本だけ */
+.eval-graph {
+    margin: 12px 0;
+}
+
+.eval-title {
+    font-weight: 700;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+}
+
+.eval-plot {
+    position: relative;
+    padding: 18px 0;
+}
+
+.eval-svg {
+    display: block;
+    width: 100%;
+    height: 120px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    cursor: pointer;
+    touch-action: none;
+}
+
+.eval-label {
+    position: absolute;
+    left: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+}
+
+.eval-label--top {
+    top: 0;
+}
+
+.eval-label--bottom {
+    bottom: 0;
+}
+
+.eval-key {
+    width: 12px;
+    height: 8px;
+    border-radius: 2px;
+}
+
+.eval-key--black {
+    background: var(--eval-black);
+}
+
+.eval-key--white {
+    background: var(--eval-white);
+}
+
+.eval-area--black {
+    fill: var(--eval-black);
+    opacity: 0.16;
+}
+
+.eval-area--white {
+    fill: var(--eval-white);
+    opacity: 0.16;
+}
+
+.eval-zero {
+    stroke: var(--line);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
+
+.eval-line {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+}
+
+.eval-cross {
+    stroke: var(--ink-soft);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
+
+.eval-tooltip {
+    position: absolute;
+    top: 22px;
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: var(--ink);
+    color: var(--bg);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 3;
+}
+
+.eval-tooltip[hidden] {
+    display: none;
+}
+
+.eval-tooltip strong {
+    font-variant-numeric: tabular-nums;
+}
+
+.eval-marker {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 0 2px var(--surface-2);
+    pointer-events: none;
+}
+
+.eval-table-wrap summary {
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+}
+
+.eval-table {
+    max-height: 160px;
+    overflow-y: auto;
+    margin: 6px 0 0;
+    padding-left: 2.6em;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
 }
 
 .record-actions {

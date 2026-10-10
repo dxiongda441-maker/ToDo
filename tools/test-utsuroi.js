@@ -330,6 +330,23 @@ test("CPU の関数は外の変数を使わない（Web Worker に文字列で�
     assert.ok(move && typeof move.from === "number");
 });
 
+test("形勢の列：局面ごとに 1 つ、決着した局面は勝った側の最大値", () => {
+    const positions = [E.newGame(31)];
+    while (!positions[positions.length - 1].result && positions.length < 30) {
+        const last = positions[positions.length - 1];
+        positions.push(E.applyMove(last, E.legalMoves(last)[0]));
+    }
+    const line = E.evaluateLine(positions, 2);
+    assert.equal(line.length, positions.length);
+    line.forEach(value => assert.ok(Math.abs(value) <= E.LINE_LIMIT));
+    const capture = makePosition({
+        pieces: { [at(3, 3)]: STONE, [at(3, 5)]: WHITE * KING, [at(6, 0)]: BLACK * KING },
+        tiles: { [at(3, 3)]: TILE.RUN }
+    });
+    const won = E.applyMove(capture, { from: at(3, 3), to: at(3, 5) });
+    assert.deepEqual(E.evaluateLine([capture, won], 2), [E.LINE_LIMIT, E.LINE_LIMIT]);
+});
+
 console.log("[詰め問題]");
 
 const PUZZLES = require(path.join(__dirname, "..", "games", "utsuroi", "puzzles.js"));
