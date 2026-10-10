@@ -2611,11 +2611,21 @@
         titleEl.innerHTML = '<div class="title-logo">ほしふるクエスト</div><div class="title-sub">― 星をとりもどす 旅 ―</div>';
         ui.appendChild(titleEl);
         const saved = loadSave();
+        // 冒険の書の 中身を 少しだけ 見せる
+        let savedInfo = null;
+        if (saved) {
+            const hero = saved.party[0];
+            savedInfo = makeWin("info", { left: "50%", bottom: "2%", transform: "translateX(-50%)", whiteSpace: "nowrap", textAlign: "center", fontSize: "0.75em", padding: "0.2em 0.7em" });
+            savedInfo.textContent = `冒険の書：${hero.name} Lv ${hero.level}　${(MAPS[saved.map] || MAPS.sora).name}　${formatTime((saved.stats && saved.stats.playMs) || 0)}${saved.cleared ? "　★クリア" : ""}`;
+        }
         const choice = await choose([
             { label: "はじめから", value: "new" },
             { label: "つづきから", value: "continue", disabled: !saved },
             { label: "せってい", value: "settings" }
-        ], { style: { left: "50%", top: "62%", transform: "translateX(-50%)" }, cancel: false, start: saved ? 1 : 0 });
+        ], { style: { left: "50%", top: "58%", transform: "translateX(-50%)" }, cancel: false, start: saved ? 1 : 0 });
+        if (savedInfo) {
+            savedInfo.remove();
+        }
         if (choice === "settings") {
             titleEl.remove();
             await menuSettingsTitle();

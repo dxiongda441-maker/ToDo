@@ -243,7 +243,8 @@ canvas {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
+    padding-top: 17%; /* 下に メニューと 冒険の書の 中身を ならべるので 上に よせる */
     gap: 0.6em;
     text-align: center;
     pointer-events: none;
