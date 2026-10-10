@@ -3,20 +3,30 @@
 /* ---------- 入力フォーム ---------- */
 .todo-form {
     display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 1rem;
+    grid-template-columns: 1fr auto auto;
+    gap: 0.75rem;
     margin-bottom: 1.75rem;
 }
 
-.todo-form input[type="text"] {
+.todo-form input[type="text"],
+.todo-form input[type="date"] {
     padding: 0.875rem 1.25rem;
     border: 1px solid var(--border);
     border-radius: 999px;
     font-size: 1rem;
     background: rgba(255, 255, 255, 0.9);
+    color: inherit;
+    font-family: inherit;
+    min-width: 0;
 }
 
-body.dark .todo-form input[type="text"] {
+.todo-form input[type="date"] {
+    padding: 0.875rem 1rem;
+    color: #475569;
+}
+
+body.dark .todo-form input[type="text"],
+body.dark .todo-form input[type="date"] {
     border-color: var(--border-dark);
     background: rgba(17, 24, 39, 0.8);
     color: inherit;
@@ -72,6 +82,23 @@ body.dark .todo-form input[type="text"] {
     background: rgba(37, 99, 235, 0.15);
     color: var(--accent-hover);
     font-weight: 600;
+}
+
+.search-input {
+    flex: 1;
+    min-width: 8rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    background: rgba(255, 255, 255, 0.9);
+    color: inherit;
+}
+
+body.dark .search-input {
+    border-color: var(--border-dark);
+    background: rgba(17, 24, 39, 0.8);
 }
 
 .clear-button {
@@ -159,9 +186,129 @@ body.dark .task-item {
     align-items: flex-start;
 }
 
+.task-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+}
+
 .task-meta {
     font-size: 0.75rem;
     color: #94a3b8;
+}
+
+/* 期限日のバッジ：色だけに頼らず文言（Overdue / Due today）でも区別する */
+.task-due {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.2);
+    color: #334155;
+}
+
+.task-due[hidden] {
+    display: none;
+}
+
+.task-due--overdue {
+    background: rgba(220, 38, 38, 0.15);
+    color: #991b1b;
+}
+
+.task-due--today {
+    background: rgba(234, 88, 12, 0.16);
+    color: #9a3412;
+}
+
+.task-due--soon {
+    background: rgba(37, 99, 235, 0.14);
+    color: #1e40af;
+}
+
+.task-due--done {
+    opacity: 0.7;
+}
+
+body.dark .task-due {
+    background: rgba(148, 163, 184, 0.25);
+    color: #e2e8f0;
+}
+
+body.dark .task-due--overdue {
+    background: rgba(239, 68, 68, 0.28);
+    color: #fecaca;
+}
+
+body.dark .task-due--today {
+    background: rgba(249, 115, 22, 0.28);
+    color: #fed7aa;
+}
+
+body.dark .task-due--soon {
+    background: rgba(59, 130, 246, 0.3);
+    color: #bfdbfe;
+}
+
+.task-item.overdue {
+    border-left: 4px solid var(--danger);
+}
+
+/* ---------- その場で編集 ---------- */
+.task-item.editing {
+    transform: none;
+}
+
+.task-edit {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.task-edit input {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    background: rgba(255, 255, 255, 0.95);
+    color: inherit;
+    min-width: 0;
+}
+
+.task-edit-text {
+    flex: 1 1 12rem;
+}
+
+body.dark .task-edit input {
+    border-color: var(--border-dark);
+    background: rgba(17, 24, 39, 0.85);
+}
+
+.task-edit button {
+    border: none;
+    border-radius: 999px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.task-edit-save {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+}
+
+.task-edit-save:hover,
+.task-edit-save:focus-visible {
+    background: var(--accent-hover);
+}
+
+.task-edit-cancel {
+    background: rgba(148, 163, 184, 0.2);
+    color: inherit;
 }
 
 body.dark .task-meta {
@@ -229,6 +376,27 @@ body.dark .summary {
     color: #cbd5f5;
 }
 
+.summary {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+}
+
+.progress {
+    flex-basis: 100%;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.25);
+    overflow: hidden;
+}
+
+.progress-bar {
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--accent), #10b981);
+    transition: width 0.3s ease;
+}
+
 .empty-state {
     margin: 0;
     text-align: center;
@@ -238,7 +406,11 @@ body.dark .summary {
 
 @media (max-width: 600px) {
     .todo-form {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .todo-form input[type="text"] {
+        grid-column: 1 / -1;
     }
 
     .todo-form button {
@@ -258,5 +430,35 @@ body.dark .summary {
         flex-direction: column;
         gap: 0.5rem;
         align-items: flex-start;
+    }
+
+    .progress {
+        width: 100%;
+        flex-basis: auto;
+    }
+}
+
+/* ---------- ダーク配色で読みにくい文字色の補正 ---------- */
+body.dark .filter-button.active {
+    color: #93c5fd;
+}
+
+body.dark .clear-button,
+body.dark .task-actions .delete-button {
+    color: #fca5a5;
+}
+
+body.dark .clear-button.disabled,
+body.dark .clear-button:disabled {
+    color: rgba(226, 232, 240, 0.6);
+}
+
+body.dark .todo-form input[type="date"] {
+    color: #e2e8f0;
+}
+
+@media (max-width: 600px) {
+    .todo-form input[type="date"] {
+        padding: 0.875rem 0.75rem;
     }
 }

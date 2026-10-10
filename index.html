@@ -10,10 +10,15 @@
 </head>
 <body>
     <main class="app">
-        <h1>ToDo List</h1>
+        <header class="app-header">
+            <h1>ToDo List</h1>
+            <button type="button" id="theme-toggle" class="theme-toggle" title="Switch color theme">Theme: Auto</button>
+        </header>
         <form id="todo-form" class="todo-form" autocomplete="off">
             <label class="visually-hidden" for="task-input">Task</label>
             <input id="task-input" name="task" type="text" placeholder="Add a new task" required>
+            <label class="visually-hidden" for="due-input">Due date (optional)</label>
+            <input id="due-input" name="due" type="date" title="Due date (optional)">
             <button type="submit">Add</button>
         </form>
 
@@ -23,6 +28,8 @@
                 <button type="button" class="filter-button" data-filter="active">Active</button>
                 <button type="button" class="filter-button" data-filter="completed">Completed</button>
             </div>
+            <label class="visually-hidden" for="search-input">Search tasks</label>
+            <input id="search-input" class="search-input" type="search" placeholder="Search tasks">
             <button type="button" id="clear-completed" class="clear-button">Clear completed</button>
         </section>
 
@@ -34,6 +41,7 @@
         <footer class="summary" aria-live="polite">
             <span id="task-count">0 tasks</span>
             <span id="completed-count">0 completed tasks</span>
+            <div class="progress" aria-hidden="true"><div id="progress-bar" class="progress-bar"></div></div>
         </footer>
 
         <section class="history-section" aria-label="Task history">
@@ -54,7 +62,22 @@
                 <p id="history-empty" class="history-empty" hidden>No activity logged for this day.</p>
             </div>
         </section>
+
+        <section class="backup-section" aria-label="Backup">
+            <h2>Backup</h2>
+            <p class="backup-note">Tasks are saved only in this browser. Export a file to keep a copy or move them to another device.</p>
+            <div class="backup-actions">
+                <button type="button" id="export-button" class="backup-button">Export</button>
+                <button type="button" id="import-button" class="backup-button">Import</button>
+                <input type="file" id="import-file" accept="application/json,.json" hidden>
+            </div>
+        </section>
     </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+        <span id="toast-message" class="toast-message"></span>
+        <button type="button" id="toast-action" class="toast-action" hidden></button>
+    </div>
 
     <template id="task-template">
         <li class="task-item">
@@ -62,7 +85,10 @@
                 <input type="checkbox" class="task-toggle">
                 <span class="task-body">
                     <span class="task-text"></span>
-                    <time class="task-meta" datetime=""></time>
+                    <span class="task-info">
+                        <time class="task-due" datetime="" hidden></time>
+                        <time class="task-meta" datetime=""></time>
+                    </span>
                 </span>
             </label>
             <div class="task-actions">
@@ -76,8 +102,11 @@
     <script src="js/utils.js" defer></script>
     <script src="js/state.js" defer></script>
     <script src="js/storage.js" defer></script>
+    <script src="js/theme.js" defer></script>
+    <script src="js/toast.js" defer></script>
     <script src="js/tasks.js" defer></script>
     <script src="js/history.js" defer></script>
+    <script src="js/backup.js" defer></script>
     <script src="js/main.js" defer></script>
 </body>
 </html>

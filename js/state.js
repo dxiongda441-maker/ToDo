@@ -8,6 +8,8 @@ TodoApp.state = (() => {
         tasks: [],
         archivedTasks: [],
         activeFilter: "all",
+        searchQuery: "",
+        editingId: null,
         selectedDate: toDateKey(Date.now()),
         currentMonth: startOfMonth(new Date())
     };

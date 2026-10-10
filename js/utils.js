@@ -7,6 +7,22 @@ TodoApp.utils = (() => {
         let month = null;
         let fullDate = null;
         let weekday = null;
+        let shortDate = null;
+        let shortDateWithYear = null;
+        try {
+            shortDate = new Intl.DateTimeFormat(undefined, {
+                month: "short",
+                day: "numeric"
+            });
+            shortDateWithYear = new Intl.DateTimeFormat(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric"
+            });
+        } catch (_error) {
+            shortDate = null;
+            shortDateWithYear = null;
+        }
         try {
             dateTime = new Intl.DateTimeFormat(undefined, {
                 dateStyle: "medium",
@@ -38,7 +54,7 @@ TodoApp.utils = (() => {
             weekday = null;
         }
 
-        return { dateTime, month, fullDate, weekday };
+        return { dateTime, month, fullDate, weekday, shortDate, shortDateWithYear };
     })();
 
     const weekdayNames = (() => {
@@ -81,6 +97,25 @@ TodoApp.utils = (() => {
         if (formatters.fullDate) {
             try {
                 return formatters.fullDate.format(date);
+            } catch (_error) {
+                // fall through
+            }
+        }
+
+        return date.toDateString();
+    }
+
+    // 期限日用の短い日付（今年なら年を省く）
+    function formatShortDate(date) {
+        if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+            return "";
+        }
+
+        const sameYear = date.getFullYear() === new Date().getFullYear();
+        const formatter = sameYear ? formatters.shortDate : formatters.shortDateWithYear;
+        if (formatter) {
+            try {
+                return formatter.format(date);
             } catch (_error) {
                 // fall through
             }
@@ -184,6 +219,7 @@ TodoApp.utils = (() => {
         weekdayNames,
         formatTimestamp,
         formatFullDate,
+        formatShortDate,
         formatMonthLabel,
         toDateKey,
         startOfMonth,

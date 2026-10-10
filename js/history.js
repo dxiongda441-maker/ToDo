@@ -261,6 +261,19 @@ TodoApp.history = (() => {
                 li.appendChild(meta);
             }
 
+            // 削除・一括削除したタスクは一覧に戻せる
+            if (entry.isArchived) {
+                const restoreButton = document.createElement("button");
+                restoreButton.type = "button";
+                restoreButton.className = "history-restore";
+                restoreButton.textContent = "Restore";
+                restoreButton.setAttribute("aria-label", `Restore "${entry.text}" to the task list`);
+                restoreButton.addEventListener("click", () => {
+                    TodoApp.tasks.restoreArchived(entry.id);
+                });
+                li.appendChild(restoreButton);
+            }
+
             historyItems.appendChild(li);
         };
 

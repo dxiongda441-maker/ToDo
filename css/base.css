@@ -52,11 +52,144 @@ body.dark .app {
     background: var(--surface-dark);
 }
 
-h1 {
-    margin-top: 0;
+/* ---------- 見出し・配色切り替え ---------- */
+.app-header {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 0.75rem;
     margin-bottom: 1.5rem;
+}
+
+h1 {
+    grid-column: 2;
+    margin: 0;
     font-size: 2rem;
     text-align: center;
+}
+
+.theme-toggle {
+    grid-column: 3;
+    justify-self: end;
+    border: 1px solid var(--border);
+    background: rgba(148, 163, 184, 0.15);
+    color: inherit;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus-visible {
+    background: rgba(37, 99, 235, 0.18);
+}
+
+body.dark .theme-toggle {
+    border-color: var(--border-dark);
+}
+
+/* ---------- お知らせ（元に戻す） ---------- */
+.toast {
+    position: fixed;
+    left: 50%;
+    bottom: 1.5rem;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    max-width: calc(100% - 2rem);
+    padding: 0.75rem 0.75rem 0.75rem 1.25rem;
+    border-radius: 999px;
+    background: #111827;
+    color: #f9fafb;
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.35);
+    font-size: 0.95rem;
+}
+
+.toast[hidden] {
+    display: none;
+}
+
+body.dark .toast {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.toast-message {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.toast-action {
+    flex-shrink: 0;
+    border: none;
+    border-radius: 999px;
+    padding: 0.4rem 0.9rem;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.toast-action:hover,
+.toast-action:focus-visible {
+    background: var(--accent-hover);
+}
+
+/* ---------- バックアップ ---------- */
+.backup-section {
+    margin-top: 2.5rem;
+    padding: 1.25rem 1.5rem;
+    border-radius: 20px;
+    border: 1px dashed rgba(148, 163, 184, 0.6);
+    display: grid;
+    gap: 0.75rem;
+}
+
+.backup-section h2 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.backup-note {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+body.dark .backup-note {
+    color: #cbd5f5;
+}
+
+.backup-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.backup-button {
+    border: none;
+    border-radius: 999px;
+    padding: 0.5rem 1.1rem;
+    background: rgba(37, 99, 235, 0.14);
+    color: var(--accent-hover);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.backup-button:hover,
+.backup-button:focus-visible {
+    background: rgba(37, 99, 235, 0.26);
+}
+
+body.dark .backup-button {
+    color: #bfdbfe;
+    background: rgba(59, 130, 246, 0.25);
 }
 
 .visually-hidden {
@@ -77,5 +210,24 @@ h1 {
 
     .app {
         padding: 1.75rem;
+    }
+
+    .app-header {
+        grid-template-columns: 1fr auto;
+    }
+
+    h1 {
+        grid-column: 1;
+        text-align: left;
+        font-size: 1.6rem;
+    }
+
+    .theme-toggle {
+        grid-column: 2;
+    }
+
+    .toast {
+        bottom: 1rem;
+        border-radius: 16px;
     }
 }

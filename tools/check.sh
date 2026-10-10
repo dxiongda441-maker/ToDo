@@ -28,7 +28,7 @@ done
 
 echo "[読み込み順（使う側より前に定義されている）]"
 order=$(grep -o 'src="js/[^"]*"' index.html | sed 's/src="js\/\(.*\)\.js"/\1/' | tr '\n' ' ')
-expected="utils state storage tasks history main "
+expected="utils state storage theme toast tasks history backup main "
 [ "$order" = "$expected" ] && ok "$order" || ng "順番が「$order」になっている（「$expected」のはず）"
 
 echo

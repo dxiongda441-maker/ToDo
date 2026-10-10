@@ -184,6 +184,28 @@ body.dark .history-item {
     border-color: rgba(148, 163, 184, 0.25);
 }
 
+.history-restore {
+    justify-self: start;
+    border: none;
+    border-radius: 999px;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: rgba(37, 99, 235, 0.14);
+    color: var(--accent-hover);
+    cursor: pointer;
+}
+
+.history-restore:hover,
+.history-restore:focus-visible {
+    background: rgba(37, 99, 235, 0.26);
+}
+
+body.dark .history-restore {
+    background: rgba(59, 130, 246, 0.25);
+    color: #bfdbfe;
+}
+
 .history-item-title {
     font-weight: 600;
     margin: 0;
@@ -268,4 +290,28 @@ body.dark .history-empty {
         flex-direction: column;
         align-items: flex-start;
     }
+}
+
+.history-status {
+    justify-self: start;
+}
+
+body.dark .month-button {
+    color: #bfdbfe;
+    background: rgba(59, 130, 246, 0.25);
+}
+
+/* スマホ幅では「5 items」の文字の代わりに点で示す（件数は読み上げ用ラベルにある） */
+@media (max-width: 600px) {
+    .calendar-day .day-events {
+        font-size: 0;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+    }
+}
+
+body.dark .calendar-day.has-history .day-number {
+    color: #93c5fd;
 }

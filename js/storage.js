@@ -4,19 +4,99 @@ window.TodoApp = window.TodoApp || {};
 TodoApp.storage = (() => {
     const STORAGE_KEY = "todo.tasks.v1";
     const ARCHIVE_STORAGE_KEY = "todo.archive.v1";
+    const DUE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
     const state = TodoApp.state;
     const { generateId } = TodoApp.utils;
+
+    // 期限日は "YYYY-MM-DD" の文字列。無い・不正なら null（項目自体を保存しない）
+    function normalizeDueDate(value) {
+        return typeof value === "string" && DUE_DATE_PATTERN.test(value) ? value : null;
+    }
+
+    // 1 件のタスクを検証して正しい形にする。直したところがあれば changed を true にする。
+    // 使えないデータなら task は null。読み込みとバックアップの取り込みの両方で使う。
+    function normalizeTask(item, now) {
+        if (!item || typeof item.text !== "string") {
+            return { task: null, changed: true };
+        }
+
+        const text = item.text.trim();
+        if (!text) {
+            return { task: null, changed: true };
+        }
+
+        let changed = false;
+        const createdAt = typeof item.createdAt === "number" ? item.createdAt : now;
+        if (typeof item.createdAt !== "number") {
+            changed = true;
+        }
+
+        let id = item.id;
+        if (typeof id !== "string" || !id.trim()) {
+            id = generateId();
+            changed = true;
+        }
+
+        const task = {
+            id,
+            text,
+            completed: Boolean(item.completed),
+            createdAt
+        };
+
+        const dueDate = normalizeDueDate(item.dueDate);
+        if (dueDate) {
+            task.dueDate = dueDate;
+        } else if (item.dueDate !== undefined) {
+            changed = true;
+        }
+
+        return { task, changed };
+    }
+
+    function normalizeArchiveRecord(item, now) {
+        const { task, changed: taskChanged } = normalizeTask(item, now);
+        if (!task) {
+            return { record: null, changed: true };
+        }
+
+        let changed = taskChanged;
+        const deletedAt = typeof item.deletedAt === "number" ? item.deletedAt : task.createdAt;
+        if (typeof item.deletedAt !== "number") {
+            changed = true;
+        }
+
+        const reason = typeof item.reason === "string" ? item.reason : "deleted";
+        const record = {
+            id: task.id,
+            text: task.text,
+            createdAt: task.createdAt,
+            deletedAt,
+            completed: task.completed,
+            reason
+        };
+        if (task.dueDate) {
+            record.dueDate = task.dueDate;
+        }
+
+        return { record, changed };
+    }
+
+    function readList(key) {
+        const raw = localStorage.getItem(key);
+        if (!raw) {
+            return null;
+        }
+
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : null;
+    }
 
     function loadTasks() {
         state.tasks = [];
         try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (!raw) {
-                return;
-            }
-
-            const parsed = JSON.parse(raw);
-            if (!Array.isArray(parsed)) {
+            const parsed = readList(STORAGE_KEY);
+            if (!parsed) {
                 return;
             }
 
@@ -24,34 +104,9 @@ TodoApp.storage = (() => {
             const now = Date.now();
 
             state.tasks = parsed.map(item => {
-                if (!item || typeof item.text !== "string") {
-                    migrated = true;
-                    return null;
-                }
-
-                const text = item.text.trim();
-                if (!text) {
-                    migrated = true;
-                    return null;
-                }
-
-                const createdAt = typeof item.createdAt === "number" ? item.createdAt : now;
-                if (typeof item.createdAt !== "number") {
-                    migrated = true;
-                }
-
-                let id = item.id;
-                if (typeof id !== "string" || !id.trim()) {
-                    id = generateId();
-                    migrated = true;
-                }
-
-                return {
-                    id,
-                    text,
-                    completed: Boolean(item.completed),
-                    createdAt
-                };
+                const { task, changed } = normalizeTask(item, now);
+                migrated = migrated || changed;
+                return task;
             }).filter(Boolean);
 
             if (migrated) {
@@ -66,51 +121,18 @@ TodoApp.storage = (() => {
     function loadArchive() {
         state.archivedTasks = [];
         try {
-            const raw = localStorage.getItem(ARCHIVE_STORAGE_KEY);
-            if (!raw) {
-                return;
-            }
-
-            const parsed = JSON.parse(raw);
-            if (!Array.isArray(parsed)) {
+            const parsed = readList(ARCHIVE_STORAGE_KEY);
+            if (!parsed) {
                 return;
             }
 
             let migrated = false;
+            const now = Date.now();
+
             state.archivedTasks = parsed.map(item => {
-                if (!item || typeof item.text !== "string") {
-                    migrated = true;
-                    return null;
-                }
-
-                const text = item.text.trim();
-                if (!text) {
-                    migrated = true;
-                    return null;
-                }
-
-                const createdAt = typeof item.createdAt === "number" ? item.createdAt : Date.now();
-                const deletedAt = typeof item.deletedAt === "number" ? item.deletedAt : createdAt;
-                if (typeof item.createdAt !== "number" || typeof item.deletedAt !== "number") {
-                    migrated = true;
-                }
-
-                let id = item.id;
-                if (typeof id !== "string" || !id.trim()) {
-                    id = generateId();
-                    migrated = true;
-                }
-
-                const reason = typeof item.reason === "string" ? item.reason : "deleted";
-
-                return {
-                    id,
-                    text,
-                    createdAt,
-                    deletedAt,
-                    completed: Boolean(item.completed),
-                    reason
-                };
+                const { record, changed } = normalizeArchiveRecord(item, now);
+                migrated = migrated || changed;
+                return record;
             }).filter(Boolean);
 
             if (migrated) {
@@ -138,5 +160,13 @@ TodoApp.storage = (() => {
         }
     }
 
-    return { loadTasks, loadArchive, saveTasks, saveArchive };
+    return {
+        loadTasks,
+        loadArchive,
+        saveTasks,
+        saveArchive,
+        normalizeTask,
+        normalizeArchiveRecord,
+        normalizeDueDate
+    };
 })();
