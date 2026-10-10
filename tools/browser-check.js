@@ -1,0 +1,162 @@
+// ヘッドレスブラウザで ToDo アプリとゲームを実際に操作して確かめる。
+//
+//   node tools/browser-check.js
+//
+// Playwright が必要（このリポジトリには入れない）。見つからなければ何もせずに終わる。
+// 例：NODE_PATH="$(npm root -g)" node tools/browser-check.js
+// 外部の背景画像は読み込まない（ネットにつながらない環境でも同じ結果になるように）。
+"use strict";
+
+const path = require("node:path");
+const fs = require("node:fs");
+const os = require("node:os");
+
+let chromium;
+try {
+    ({ chromium } = require("playwright"));
+} catch (_error) {
+    console.log("Playwright が見つからないため、ブラウザでの確認は飛ばしました。");
+    process.exit(0);
+}
+
+const root = path.join(__dirname, "..");
+const todoUrl = `file://${path.join(root, "index.html")}`;
+const gameUrl = `file://${path.join(root, "games", "utsuroi", "index.html")}`;
+
+let failed = 0;
+function check(condition, label) {
+    if (condition) {
+        console.log(`  ok  ${label}`);
+    } else {
+        failed += 1;
+        console.log(`  NG  ${label}`);
+    }
+}
+
+async function newPage(browser, viewport) {
+    const page = await browser.newPage({ viewport, acceptDownloads: true });
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.route("https://images.unsplash.com/**", route => route.abort());
+    return { page, errors };
+}
+
+const texts = page => page.$$eval(".task-text", els => els.map(el => el.textContent));
+
+async function checkTodo(browser, width) {
+    console.log(`[ToDo アプリ・幅 ${width}px]`);
+    const { page, errors } = await newPage(browser, { width, height: 900 });
+    await page.goto(todoUrl);
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+
+    const today = await page.evaluate(() => TodoApp.utils.toDateKey(Date.now()));
+    await page.fill("#task-input", "Buy milk");
+    await page.fill("#due-input", today);
+    await page.press("#task-input", "Enter");
+    await page.fill("#task-input", "Write report");
+    await page.press("#task-input", "Enter");
+    check((await texts(page)).join() === "Write report,Buy milk", "タスクを追加できる");
+    check((await page.textContent(".task-item:has-text('Buy milk') .task-due")) === "Due today", "期限日が表示される");
+
+    await page.click(".task-item:has-text('Buy milk') .edit-button");
+    await page.fill(".task-edit-text", "Buy oat milk");
+    await page.press(".task-edit-text", "Enter");
+    check((await texts(page)).includes("Buy oat milk"), "その場で編集できる");
+
+    await page.check(".task-item:has-text('Write report') .task-toggle");
+    await page.click("[data-filter=active]");
+    check((await texts(page)).join() === "Buy oat milk", "フィルター（Active）");
+    await page.click("[data-filter=all]");
+
+    await page.fill("#search-input", "oat");
+    check((await texts(page)).join() === "Buy oat milk", "検索");
+    await page.fill("#search-input", "");
+
+    await page.click(".task-item:has-text('Buy oat milk') .delete-button");
+    await page.click("#toast-action");
+    check((await texts(page)).includes("Buy oat milk"), "削除を元に戻せる");
+
+    await page.click("#clear-completed");
+    check(!(await texts(page)).includes("Write report"), "Clear completed");
+    await page.click(".history-item:has-text('Write report') .history-restore");
+    check((await texts(page)).includes("Write report"), "履歴から復元できる");
+
+    const [download] = await Promise.all([page.waitForEvent("download"), page.click("#export-button")]);
+    const backupPath = path.join(os.tmpdir(), `todo-backup-check-${process.pid}.json`);
+    await download.saveAs(backupPath);
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await page.setInputFiles("#import-file", backupPath);
+    await page.waitForFunction(() => document.querySelectorAll(".task-text").length === 2);
+    check(true, "書き出したバックアップを取り込める");
+    fs.unlinkSync(backupPath);
+
+    const monthBefore = await page.textContent("#month-label");
+    await page.click("#prev-month");
+    check((await page.textContent("#month-label")) !== monthBefore, "カレンダーの月を切り替えられる");
+
+    await page.click("#theme-toggle");
+    await page.click("#theme-toggle");
+    check(await page.evaluate(() => document.body.classList.contains("dark")), "ダーク配色に切り替えられる");
+
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    check(scrollWidth <= width, `横にはみ出さない（${scrollWidth}px）`);
+    check(errors.length === 0, `JavaScript のエラーなし ${errors.join(" / ")}`);
+    await page.close();
+}
+
+async function checkGame(browser, width) {
+    console.log(`[うつろい・幅 ${width}px]`);
+    const { page, errors } = await newPage(browser, { width, height: 900 });
+    await page.goto(gameUrl);
+    await page.evaluate(() => {
+        localStorage.clear();
+        localStorage.setItem("utsuroi.seenRules.v1", "true");
+        localStorage.setItem("utsuroi.settings.v1", JSON.stringify({ mode: "cpu", level: "easy", side: "black", swap: false, handicap: "none" }));
+    });
+    await page.reload();
+    check((await page.$$(".board .cell")).length === 49, "盤が 7×7 で表示される");
+
+    let moved = false;
+    for (const view of [42, 43, 44, 45, 46, 47, 48]) {
+        await page.click(`.board .cell[data-view="${view}"]`);
+        const targets = await page.$$eval(".board .cell.target", els => els.map(el => el.dataset.view));
+        if (targets.length > 0) {
+            await page.click(`.board .cell[data-view="${targets[0]}"]`);
+            moved = true;
+            break;
+        }
+    }
+    check(moved, "駒を選んで動かせる");
+    await page.waitForFunction(() => document.querySelectorAll("#move-log li").length >= 2, null, { timeout: 15000 });
+    check(true, "CPU が指し返す");
+
+    await page.click("#undo-button");
+    await page.waitForTimeout(200);
+    check((await page.$$("#move-log li")).length === 0, "待ったで戻せる");
+
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    check(scrollWidth <= width, `横にはみ出さない（${scrollWidth}px）`);
+    check(errors.length === 0, `JavaScript のエラーなし ${errors.join(" / ")}`);
+    await page.close();
+}
+
+(async () => {
+    const browser = await chromium.launch();
+    try {
+        for (const width of [375, 1024]) {
+            await checkTodo(browser, width);
+            await checkGame(browser, width);
+        }
+    } finally {
+        await browser.close();
+    }
+    console.log();
+    if (failed === 0) {
+        console.log("すべて OK");
+    } else {
+        console.log(`${failed} 件の NG があります`);
+        process.exit(1);
+    }
+})();

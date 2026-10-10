@@ -12,6 +12,12 @@
 - 配色：Auto（端末の設定に合わせる）/ Light / Dark
 - バックアップ：Export で JSON ファイルに保存、Import で取り込み（同じタスクは二重にならない）
 
+## おまけ：盤上戦略ゲーム「うつろい」
+
+`games/utsuroi/index.html` を開くと遊べます（ToDo 画面の一番下にもリンクがあります）。
+駒の動きを床の紋が決め、駒が離れるたびに床が変わる、オリジナルの 2 人用ゲームです。
+ルールと設計の説明は [`games/utsuroi/README.md`](games/utsuroi/README.md) にあります。
+
 ## 保存データ
 
 | localStorage のキー | 中身 |
@@ -28,7 +34,12 @@ ToDo/
 ├── CLAUDE.md         Claude に作業してもらうときのルール
 ├── STATUS.md         今の作業状況（ブランチ・次にやること）
 ├── tools/
-│   └── check.sh      基本チェック（bash tools/check.sh）
+│   ├── check.sh             基本チェック（bash tools/check.sh）。ゲームのテストも動かす
+│   ├── browser-check.js     ブラウザで実際に操作して確かめる（Playwright がある環境だけ）
+│   ├── test-utsuroi.js      ゲームのルールと CPU のテスト
+│   └── utsuroi-selfplay.js  ゲームの CPU 同士の対局で、ルールの釣り合いを調べる
+├── games/
+│   └── utsuroi/      盤上戦略ゲーム「うつろい」（README.md に詳しい説明）
 ├── .github/          自動チェックとプルリクエストのひな形
 ├── css/
 │   ├── base.css      色変数・背景・全体レイアウト・共通クラス

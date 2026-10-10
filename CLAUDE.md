@@ -18,9 +18,20 @@
 ## 変更したら
 
 1. `bash tools/check.sh` が「すべて OK」になることを確かめる（GitHub でも push のたびに自動で動く）。
-2. `index.html` をブラウザで開き、タスクの追加・完了・編集・削除、フィルター、
-   「Clear completed」、履歴カレンダーの月の切り替えを確かめる。
+2. `index.html` をブラウザで開き、タスクの追加・完了・編集・削除、フィルター、検索、
+   「Clear completed」と Undo、履歴カレンダーの月の切り替えと Restore、配色の切り替えを確かめる。
+   Playwright がある環境なら `node tools/browser-check.js` でまとめて確かめられる（375px と 1024px）。
 3. スマホ幅（375px）で崩れていないか見る。
+
+## ゲーム（games/utsuroi）
+
+- 画面の文言は日本語（ToDo アプリと違うので注意）。
+- `engine.js` はルールと CPU だけを持ち、DOM を触らない。CPU は `createUtsuroiEngine` 関数を
+  文字列にして Web Worker で動かすので、**この関数の外の変数を参照しない**
+  （`tools/test-utsuroi.js` で確かめている）。
+- ルールを変えたら `tools/test-utsuroi.js` を直し、`node tools/utsuroi-selfplay.js 40 hard 150` で
+  先手・後手の勝率や手数が極端になっていないか確かめ、`games/utsuroi/README.md` の表も直す。
+- 保存データのキー（`utsuroi.*.v1`）の形式を変えるときは、古い形式も読めるようにする。
 
 ## 作業の進め方
 
