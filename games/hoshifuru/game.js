@@ -100,14 +100,15 @@
 
     let playClock = performance.now();
 
-    function saveGame() {
+    // overrides は 冒険の書にだけ 書く値（エンディングの とちゅうで 閉じても ソラの村から つづけられるように）
+    function saveGame(overrides) {
         if (!game) {
             return false;
         }
         const now = performance.now();
         game.stats.playMs += now - playClock;
         playClock = now;
-        return writeJson(SAVE_KEY, Object.assign({}, game, { savedAt: Date.now() }));
+        return writeJson(SAVE_KEY, Object.assign({}, game, overrides || {}, { savedAt: Date.now() }));
     }
 
     function loadSave() {
@@ -960,6 +961,7 @@
                 if (result !== "win") {
                     return false;
                 }
+                busy = true; // 戦闘が おわっても できごとの つづきが ある間は 歩けない
                 if (extra && extra.flag) {
                     game.flags[extra.flag] = true;
                 }
@@ -2658,7 +2660,7 @@
         }
         game.cleared = true;
         game.flags.cleared = true; // クリア後に 出てくる人の 目じるし
-        saveGame();
+        saveGame({ map: "sora", x: 11, y: 15, dir: "up" });
         closeMessage();
         await fade(() => {
             scene = "ending";
