@@ -383,7 +383,7 @@ function check(condition, label) {
     await page.evaluate(() => {
         HF.debug.setLevel(30);
         HF.debug.game.party.forEach(member => {
-            Object.assign(member.bonus, { hp: 150, str: 40, def: 40, agi: 20 });
+            Object.assign(member.bonus, { hp: 300, str: 80, def: 80, agi: 40 });
             member.hp = member.base.hp + member.bonus.hp;
         });
     });
