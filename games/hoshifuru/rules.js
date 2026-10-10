@@ -377,7 +377,7 @@
             return;
         }
         caster.mp -= spell.mp;
-        events.push({ type: "spell", caster: casterIndex, mp: caster.mp, text: `${caster.name}は ${spell.name}を となえた！` });
+        events.push({ type: "spell", caster: casterIndex, spell: spellId, mp: caster.mp, text: `${caster.name}は ${spell.name}を となえた！` });
         const wis = wisdomOf(caster);
 
         if (spell.effect === "damage") {

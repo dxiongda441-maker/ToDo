@@ -1288,6 +1288,9 @@
         return commands;
     }
 
+    // じゅもんの 光の色（属性ごと）
+    const SPELL_COLORS = { fire: "#ff8a3d", ice: "#7fdcff", thunder: "#ffe94d", light: "#fff2b3", blast: "#ff5a5a" };
+
     async function playEvents(events, shown, status) {
         for (const event of events) {
             if (event.type === "enemyHit") {
@@ -1316,10 +1319,15 @@
             } else if (event.type === "spell") {
                 shown[event.caster].mp = event.mp;
                 status.refresh();
+                const spell = data.spells[event.spell] || {};
+                const color = SPELL_COLORS[spell.element] || (spell.effect === "heal" || spell.effect === "revive" || spell.effect === "cure" ? "#7dffa8" : "#ffffff");
                 battleView.screenFlash = performance.now() + 180;
+                battleView.flashColor = color;
+                battleView.effect = { color, start: performance.now(), rise: spell.target === "ally" || spell.target === "allies" };
                 audio.se("spell");
             } else if (event.type === "critical") {
                 battleView.screenFlash = performance.now() + 120;
+                battleView.flashColor = "#ffffff";
                 audio.se("critical");
             } else if (event.type === "enemyAct") {
                 battleView.lunge = { index: event.index, until: performance.now() + 200 };
@@ -1671,6 +1679,7 @@
                 { label: "どうぐ", value: "item" },
                 { label: "そうび", value: "equip" },
                 { label: "つよさ", value: "status" },
+                { label: "ちず", value: "map" },
                 { label: "きろく", value: "records" },
                 { label: "せってい", value: "settings" }
             ], { style: { left: "3%", top: "3%" }, cols: 2 });
@@ -1685,6 +1694,8 @@
                 await menuEquip(status);
             } else if (choice === "status") {
                 await menuStatus();
+            } else if (choice === "map") {
+                await menuMap();
             } else if (choice === "records") {
                 await menuRecords();
             } else if (choice === "settings") {
@@ -2020,6 +2031,94 @@
         }
     }
 
+    // つぎに どこへ 行けば いいか（フラグから 決める）。place は 世界地図の 記号
+    function nextGoal() {
+        const f = game.flags;
+        if (!f.shizuku1) {
+            return { place: "c", text: "北の ほらあなの おくで、ほしのしずくを さがそう。" };
+        }
+        if (!f.joinedLuna) {
+            return { place: "2", text: "東の 川を わたって、南東の 港町マリンへ 行こう。" };
+        }
+        if (!f.shizuku2) {
+            return { place: "w", text: "港町マリンの 北の さばくに たつ、風の塔の てっぺんを めざそう。" };
+        }
+        if (!f.joinedMint) {
+            return { place: "3", text: "北の 山の けっかいが とけた。 北東の 森の村リーフへ 行こう。" };
+        }
+        if (!f.shizuku3) {
+            return { place: "s", text: "東の はずれの 湖の神殿で、さいごの しずくを さがそう。" };
+        }
+        if (!f.bossFinal) {
+            return { place: "k", text: "湖に かかった 光の橋を わたり、かげの城へ のりこもう。" };
+        }
+        if (!f.bossStar) {
+            return { place: "1", text: "ソラの村の 星のせいれいが、星の遺跡へ つれていってくれる。" };
+        }
+        return { place: "2", text: "港町マリンの とうぎじょうや、まもの ずかん あつめに ちょうせんしよう。" };
+    }
+
+    // 世界地図の ぜんたいと、いまいる場所・つぎの 目的地を 見せる
+    function menuMap() {
+        const world = MAPS.world;
+        const scale = 4;
+        const COLORS = {
+            ".": "#5fae4e", T: "#2e7d32", "^": "#8d7b68", "~": "#2a6fc9", ":": "#d8c27a", ",": "#6b5a7b", "=": "#a0703a"
+        };
+        const goal = nextGoal();
+        const here = (() => {
+            if (game.map === "world") {
+                return { x: game.x, y: game.y };
+            }
+            const map = currentMap();
+            const ch = map.place || Object.keys(world.places).find(key => world.places[key].map === game.map);
+            return ch ? placePosition(ch) : null;
+        })();
+        const goalAt = placePosition(goal.place);
+        let blink = 0;
+        let timer = null;
+        return panel({}, el => {
+            if (!el.querySelector("canvas")) {
+                el.innerHTML = '<div>せかいちず</div><canvas style="display:block;width:100%;max-height:72%;object-fit:contain;image-rendering:pixelated;margin:0.2em 0"></canvas><div class="info"></div>';
+                const mapCanvas = el.querySelector("canvas");
+                mapCanvas.width = world.rows[0].length * scale;
+                mapCanvas.height = world.rows.length * scale;
+                const draw = () => {
+                    const g2 = mapCanvas.getContext("2d");
+                    world.rows.forEach((row, y) => {
+                        [...row].forEach((ch, x) => {
+                            let color = COLORS[ch];
+                            if (GATES[ch]) {
+                                color = gateOpen(ch) ? (ch === "L" ? "#ffe066" : "#a0703a") : (ch === "L" ? "#2a6fc9" : "#b07ad8");
+                            } else if (world.places[ch]) {
+                                color = game.visited[world.places[ch].map] || ch === "1" ? "#ffffff" : "#d0d0d0";
+                            }
+                            g2.fillStyle = color || "#5fae4e";
+                            g2.fillRect(x * scale, y * scale, scale, scale);
+                        });
+                    });
+                    blink += 1;
+                    if (goalAt) {
+                        g2.strokeStyle = blink % 2 ? "#ffd34d" : "#ff6b6b";
+                        g2.lineWidth = 1;
+                        g2.strokeRect(goalAt.x * scale - 2.5, goalAt.y * scale - 2.5, scale + 5, scale + 5);
+                    }
+                    if (here && blink % 2) {
+                        g2.fillStyle = "#ff2d2d";
+                        g2.fillRect(here.x * scale, here.y * scale, scale, scale);
+                    }
+                    if (!document.body.contains(mapCanvas)) {
+                        clearInterval(timer);
+                    }
+                };
+                draw();
+                timer = setInterval(draw, 400);
+                el.querySelector(".info").textContent = `■ いまいる ところ（${currentMap().name}）　□ つぎの もくてき\n${goal.text}`;
+                el.querySelector(".info").style.whiteSpace = "pre-wrap";
+            }
+        });
+    }
+
     // ずかんに のる まもの（かげの王の しんのすがたは 出会うまで ひみつ）
     function bookKinds() {
         return Object.keys(data.enemies).filter(id => id !== "kagenoou2" || game.seen[id]);
@@ -2349,9 +2448,27 @@
             }
             x += size + gap;
         });
+        // じゅもんの 光のつぶ（攻撃は 上から ふりそそぎ、回復は 下から のぼる）
+        const effect = view.effect;
+        if (effect && now - effect.start < 600) {
+            const t = (now - effect.start) / 600;
+            ctx.fillStyle = effect.color;
+            for (let i = 0; i < 28; i += 1) {
+                const px = ((i * 97) % 240) + 16;
+                const offset = ((i * 53) % 60) / 60;
+                const p = (t + offset) % 1;
+                const py = effect.rise ? 200 - p * 150 : 20 + p * 120;
+                const size = i % 3 === 0 ? 3 : 2;
+                ctx.globalAlpha = 1 - t * 0.7;
+                ctx.fillRect(px, py, size, size);
+            }
+            ctx.globalAlpha = 1;
+        }
         if (view.screenFlash && now < view.screenFlash) {
-            ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = view.flashColor || "#ffffff";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.globalAlpha = 1;
         }
     }
 
