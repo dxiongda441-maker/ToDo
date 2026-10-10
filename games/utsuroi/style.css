@@ -853,6 +853,49 @@ input {
     letter-spacing: 0.08em;
 }
 
+/* ---------- 棋譜の再生 ---------- */
+.replay-card {
+    border-color: var(--focus);
+    box-shadow: 0 0 0 2px rgba(47, 111, 214, 0.25);
+}
+
+.replay-step {
+    margin: 0 0 6px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.replay-slider {
+    width: 100%;
+    margin: 4px 0 10px;
+}
+
+.replay-controls .action {
+    min-width: 52px;
+    font-size: 1.05rem;
+}
+
+.record-actions {
+    margin: 10px 0 0;
+}
+
+.record-actions .small-button {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}
+
+.record-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface-2);
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    word-break: break-all;
+    resize: vertical;
+}
+
 /* ---------- 詰め問題 ---------- */
 .puzzle-card {
     border-color: #16a34a;

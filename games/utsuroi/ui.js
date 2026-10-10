@@ -86,19 +86,24 @@
         thinking: false,
         token: 0,
         recorded: false,
-        puzzle: null // 詰め問題を解いているときの問題データ
+        puzzle: null, // 詰め問題を解いているときの問題データ
+        replay: null // 棋譜を再生しているとき { positions, index }
     };
 
     const current = () => game.history[game.history.length - 1];
-    // mode は "cpu"（CPU 対戦）/ "local"（2 人対戦）/ "puzzle"（詰め問題。相手は CPU）
-    const isCpuTurn = () => game.mode !== "local" && current().turn !== game.human && !current().result;
-    const isHumanTurn = () => !current().result && (game.mode === "local" || current().turn === game.human);
+    // mode は "cpu"（CPU 対戦）/ "local"（2 人対戦）/ "puzzle"（詰め問題。相手は CPU）/ "replay"（棋譜の再生）
+    const isCpuTurn = () => (game.mode === "cpu" || game.mode === "puzzle") && current().turn !== game.human && !current().result;
+    const isHumanTurn = () => game.mode !== "replay" && !current().result
+        && (game.mode === "local" || current().turn === game.human);
 
     function squareName(index) {
         return `${COLUMNS[E.colOf(index)]}${SIZE - E.rowOf(index)}`;
     }
 
     function playerLabel(side) {
+        if (game.mode === "replay") {
+            return side === BLACK ? "先手" : "後手";
+        }
         if (game.mode !== "local") {
             return side === game.human ? "あなた" : "CPU";
         }
@@ -266,8 +271,11 @@
         renderLog();
         boardCodeEl.textContent = E.seedToCode(position.seed);
         codeCard.hidden = game.mode === "puzzle";
+        $("#play-card").hidden = game.mode === "replay";
+        $(".record-actions").hidden = game.mode === "puzzle" || game.mode === "replay";
         renderPuzzleCard();
-        undoButton.disabled = game.history.length <= 1 || game.thinking;
+        renderReplayCard();
+        undoButton.disabled = game.history.length <= 1 || game.thinking || game.mode === "replay";
         hintButton.disabled = !isHumanTurn() || game.thinking;
     }
 
@@ -317,6 +325,8 @@
             status = describeResult(position.result).title;
         } else if (game.thinking) {
             status = "CPU が考えています…";
+        } else if (game.mode === "replay") {
+            status = `棋譜の再生中（${game.replay.index} / ${game.replay.positions.length - 1} 手）`;
         } else if (game.mode === "puzzle") {
             status = `あなたの番（${SIDE_NAME[game.human]}）。あと ${puzzleMovesLeft()} 手以内に勝ってください。`;
         } else if (game.mode === "cpu") {
@@ -356,17 +366,25 @@
     }
 
     function renderLog() {
-        const items = game.history.slice(1).map((position, i) => {
+        // 再生中は全部の手を並べ、今表示している手に印を付ける
+        const source = game.mode === "replay" ? game.replay.positions : game.history;
+        const currentIndex = game.mode === "replay" ? game.replay.index - 1 : game.history.length - 2;
+        const items = source.slice(1).map((position, i) => {
             const move = position.lastMove;
             const side = position.turn === BLACK ? WHITE : BLACK;
             const capture = move.captured !== 0 ? "×" : "→";
             const king = Math.abs(move.piece) === KING ? "王" : "";
             const tileChange = `${TILE_INFO[move.tileBefore].kanji}→${TILE_INFO[move.tileAfter].kanji}`;
             const swapNote = i === 0 && game.swapTaken ? "（入れ替え）" : "";
-            return `<li${i === game.history.length - 2 ? ' class="current"' : ""}>${SIDE_NAME[side]} ${king}${squareName(move.from)}${capture}${squareName(move.to)} <span class="muted small">床 ${tileChange}</span>${swapNote}</li>`;
+            return `<li${i === currentIndex ? ' class="current"' : ""} data-step="${i + 1}">${SIDE_NAME[side]} ${king}${squareName(move.from)}${capture}${squareName(move.to)} <span class="muted small">床 ${tileChange}</span>${swapNote}</li>`;
         });
         moveLogEl.innerHTML = items.join("");
-        moveLogEl.scrollTop = moveLogEl.scrollHeight;
+        const currentItem = moveLogEl.querySelector(".current");
+        if (game.mode === "replay" && currentItem) {
+            moveLogEl.scrollTop = currentItem.offsetTop - moveLogEl.clientHeight / 2;
+        } else {
+            moveLogEl.scrollTop = moveLogEl.scrollHeight;
+        }
     }
 
     function renderLegend() {
@@ -694,7 +712,7 @@ self.onmessage = event => {
 
         const description = describeResult(result);
         showResult(description.emoji, description.title, description.text, [
-            ["review", "盤面を見る"],
+            ["replay", "振り返る"],
             ["same", "同じ盤でもう一度"],
             ["new", "新しい盤で", true]
         ]);
@@ -721,12 +739,136 @@ self.onmessage = event => {
             startGame(Object.assign({}, settings, { seed: current().seed }));
         } else if (choice === "new") {
             startGame(Object.assign({}, settings, { seed: null }));
+        } else if (choice === "replay") {
+            startReplay(game.history.slice());
         } else if (choice === "puzzle-next") {
             startPuzzle(nextPuzzle());
         } else if (choice === "puzzle-list") {
             openPuzzleList();
         }
     });
+
+    // ---------- 棋譜コード（共有と再生） ----------
+    // 形式：UT1-<盤面コード>-<駒落ち>-<手>。駒落ちは 0 / b1〜b3 / w1〜w3。
+    // 手は「動かす前のマス」「動かした先のマス」を 1 文字ずつ（0〜48 を下の文字に置き換える）
+    const SQUARE_CHARS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM";
+
+    function encodeRecord(positions) {
+        const start = positions[0];
+        const handicap = start.handicap
+            ? `${start.handicap.side === BLACK ? "b" : "w"}${start.handicap.stones}`
+            : "0";
+        const moves = positions.slice(1)
+            .map(position => SQUARE_CHARS[position.lastMove.from] + SQUARE_CHARS[position.lastMove.to])
+            .join("");
+        return `UT1-${E.seedToCode(start.seed)}-${handicap}-${moves || "_"}`;
+    }
+
+    // 棋譜コードを局面の列にする。読めないときは Error（画面に出すメッセージ付き）
+    function decodeRecord(text) {
+        const match = /^UT1-([0-9A-Za-z]{1,7})-(0|[bw][1-3])-([0-9a-zA-M]*|_)$/.exec(String(text).replace(/\s+/g, ""));
+        if (!match) {
+            throw new Error("棋譜コードの形が正しくありません（UT1- で始まる文字列を、そのまま貼り付けてください）。");
+        }
+        const seed = E.codeToSeed(match[1]);
+        if (!seed) {
+            throw new Error("棋譜コードの盤面コードが読めません。");
+        }
+        const handicap = match[2] === "0"
+            ? null
+            : { side: match[2][0] === "b" ? BLACK : WHITE, stones: Number(match[2][1]) };
+        const moves = match[3] === "_" ? "" : match[3];
+        if (moves.length % 2 !== 0) {
+            throw new Error("棋譜コードが途中で切れているようです。");
+        }
+        const positions = [E.newGame(seed, { handicap })];
+        for (let k = 0; k < moves.length; k += 2) {
+            const from = SQUARE_CHARS.indexOf(moves[k]);
+            const to = SQUARE_CHARS.indexOf(moves[k + 1]);
+            try {
+                positions.push(E.applyMove(positions[positions.length - 1], { from, to }));
+            } catch (_error) {
+                throw new Error(`${k / 2 + 1} 手目が、ルール上指せない手になっています。`);
+            }
+        }
+        return positions;
+    }
+
+    function startReplay(positions, index) {
+        game.token += 1;
+        game.mode = "replay";
+        game.puzzle = null;
+        game.replay = { positions, index: index === undefined ? positions.length - 1 : index };
+        game.selected = null;
+        game.hint = null;
+        game.thinking = false;
+        game.flipManual = false;
+        game.flipped = false;
+        game.handicap = positions[0].handicap || null;
+        showReplayStep();
+    }
+
+    function showReplayStep() {
+        const replay = game.replay;
+        replay.index = Math.max(0, Math.min(replay.positions.length - 1, replay.index));
+        game.history = replay.positions.slice(0, replay.index + 1);
+        render();
+        const position = current();
+        if (position.result) {
+            statusEl.textContent = `${describeResult(position.result).title}（${position.result.reason === "capture" ? "王を取った" : position.result.reason === "arrival" ? "玉座に到達" : position.result.reason === "limit" ? "手数切れ" : "相手が動けない"}）`;
+        }
+    }
+
+    function renderReplayCard() {
+        const card = $("#replay-card");
+        card.hidden = game.mode !== "replay";
+        if (game.mode !== "replay") {
+            return;
+        }
+        const replay = game.replay;
+        const total = replay.positions.length - 1;
+        $("#replay-step").textContent = `${replay.index} / ${total} 手目`;
+        const slider = $("#replay-slider");
+        slider.max = String(total);
+        slider.value = String(replay.index);
+        card.querySelector('[data-replay="first"]').disabled = replay.index === 0;
+        card.querySelector('[data-replay="prev"]').disabled = replay.index === 0;
+        card.querySelector('[data-replay="next"]').disabled = replay.index === total;
+        card.querySelector('[data-replay="last"]').disabled = replay.index === total;
+    }
+
+    function stepReplay(action) {
+        if (game.mode !== "replay") {
+            return;
+        }
+        const replay = game.replay;
+        const steps = { first: -Infinity, prev: -1, next: 1, last: Infinity };
+        const delta = steps[action];
+        if (delta === -Infinity) {
+            replay.index = 0;
+        } else if (delta === Infinity) {
+            replay.index = replay.positions.length - 1;
+        } else {
+            replay.index += delta;
+        }
+        showReplayStep();
+    }
+
+    async function copyRecord() {
+        const code = encodeRecord(game.history);
+        try {
+            await navigator.clipboard.writeText(code);
+            showToast("棋譜コードをコピーしました。「棋譜を読み込む」に貼り付けると再生できます。");
+        } catch (_error) {
+            // クリップボードが使えないときは、読み込み欄に入れて見せる（そこから手でコピーできる）
+            const form = $("#record-form");
+            form.elements.record.value = code;
+            $("#record-error").hidden = true;
+            $("#record-dialog").showModal();
+            form.elements.record.select();
+            showToast("棋譜コードを表示しました。選択してコピーしてください。");
+        }
+    }
 
     // ---------- 詰め問題 ----------
     function loadSolved() {
@@ -903,6 +1045,7 @@ self.onmessage = event => {
     // 保存してある対局に戻る（無ければ新しく始める）
     function resumeSavedOrNew() {
         game.puzzle = null;
+        game.replay = null;
         if (restoreGame()) {
             render();
             if (current().result) {
@@ -965,6 +1108,7 @@ self.onmessage = event => {
     function resetGameState(options) {
         game.token += 1;
         game.puzzle = null;
+        game.replay = null;
         game.mode = options.mode === "local" ? "local" : "cpu";
         game.level = E.LEVELS[options.level] ? options.level : "normal";
         game.startHuman = options.startHuman !== undefined ? options.startHuman : resolveSide(options.side);
@@ -1062,7 +1206,7 @@ self.onmessage = event => {
 
     // ---------- 対局の保存と再開 ----------
     function saveGame() {
-        if (game.mode === "puzzle") {
+        if (game.mode === "puzzle" || game.mode === "replay") {
             return; // 詰め問題は保存しない（保存してある対局を上書きしない）
         }
         save(GAME_KEY, {
@@ -1222,6 +1366,56 @@ self.onmessage = event => {
                 showToast(`盤面コード ${code} をコピーしました。`);
             } catch (_error) {
                 showToast(`盤面コード：${code}`);
+            }
+        });
+
+        $("#record-review").addEventListener("click", () => startReplay(game.history.slice(), 0));
+        $("#record-copy").addEventListener("click", copyRecord);
+        $("#record-load").addEventListener("click", () => {
+            $("#record-error").hidden = true;
+            $("#record-form").elements.record.value = "";
+            $("#record-dialog").showModal();
+        });
+        $("#record-form").addEventListener("submit", event => {
+            const text = $("#record-form").elements.record.value.trim();
+            try {
+                const positions = decodeRecord(text);
+                startReplay(positions, 0);
+            } catch (error) {
+                event.preventDefault();
+                $("#record-error").textContent = error.message;
+                $("#record-error").hidden = false;
+            }
+        });
+        document.querySelectorAll("[data-replay]").forEach(button => {
+            button.addEventListener("click", () => stepReplay(button.dataset.replay));
+        });
+        $("#replay-slider").addEventListener("input", event => {
+            game.replay.index = Number(event.target.value);
+            showReplayStep();
+        });
+        $("#replay-exit").addEventListener("click", resumeSavedOrNew);
+        moveLogEl.addEventListener("click", event => {
+            const item = event.target.closest("li[data-step]");
+            if (item && game.mode === "replay") {
+                game.replay.index = Number(item.dataset.step);
+                showReplayStep();
+            }
+        });
+        document.addEventListener("keydown", event => {
+            if (game.mode !== "replay" || document.querySelector("dialog[open]")) {
+                return;
+            }
+            const tag = event.target && event.target.tagName;
+            if (tag === "INPUT" || tag === "TEXTAREA") {
+                return;
+            }
+            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+                if (event.target && event.target.classList && event.target.classList.contains("cell")) {
+                    return; // 盤の上では矢印キーはマスの移動に使う
+                }
+                event.preventDefault();
+                stepReplay(event.key === "ArrowLeft" ? "prev" : "next");
             }
         });
 

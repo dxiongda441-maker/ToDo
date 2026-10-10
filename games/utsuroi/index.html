@@ -46,7 +46,21 @@
                     </div>
                 </section>
 
-                <section class="card">
+                <section class="card replay-card" id="replay-card" hidden>
+                    <h2>棋譜の再生</h2>
+                    <p id="replay-step" class="replay-step"></p>
+                    <input type="range" id="replay-slider" class="replay-slider" min="0" max="0" value="0" aria-label="何手目を表示するか">
+                    <div class="actions replay-controls">
+                        <button type="button" class="action" data-replay="first" aria-label="最初へ">⏮</button>
+                        <button type="button" class="action" data-replay="prev" aria-label="1 手戻る">◀</button>
+                        <button type="button" class="action" data-replay="next" aria-label="1 手進む">▶</button>
+                        <button type="button" class="action" data-replay="last" aria-label="最後へ">⏭</button>
+                    </div>
+                    <p class="muted small">キーボードの ← → でも動かせます。</p>
+                    <button type="button" id="replay-exit" class="action">対局に戻る</button>
+                </section>
+
+                <section class="card" id="play-card">
                     <div class="turn-row">
                         <span id="turn-badge" class="turn-badge"></span>
                         <span id="ply-counter" class="ply-counter"></span>
@@ -84,9 +98,14 @@
                     <p class="muted small">同じコードを入れると、同じ盤で遊べます。友だちと同じ盤で腕比べもできます。</p>
                 </section>
 
-                <section class="card">
+                <section class="card" id="log-card">
                     <h2>棋譜</h2>
                     <ol id="move-log" class="move-log"></ol>
+                    <div class="actions record-actions">
+                        <button type="button" id="record-review" class="small-button">振り返る</button>
+                        <button type="button" id="record-copy" class="small-button">棋譜コードをコピー</button>
+                        <button type="button" id="record-load" class="small-button">棋譜を読み込む</button>
+                    </div>
                 </section>
 
                 <section class="card">
@@ -169,6 +188,23 @@
             <h2 id="result-title"></h2>
             <p id="result-text"></p>
             <div class="dialog-actions" id="result-actions"></div>
+        </form>
+    </dialog>
+
+    <!-- 棋譜コードの読み込み -->
+    <dialog id="record-dialog" class="dialog">
+        <form method="dialog" id="record-form" class="dialog-body">
+            <h2>棋譜を読み込む</h2>
+            <p class="muted">「棋譜コードをコピー」で作ったコード（UT1- で始まる文字列）を貼り付けると、その対局を 1 手ずつ再生できます。</p>
+            <label class="field">
+                <span>棋譜コード</span>
+                <textarea name="record" rows="4" class="record-input" spellcheck="false" autocomplete="off" placeholder="UT1-..."></textarea>
+            </label>
+            <p id="record-error" class="error" hidden></p>
+            <div class="dialog-actions">
+                <button type="button" class="secondary" data-close>やめる</button>
+                <button type="submit" class="primary" value="load">再生する</button>
+            </div>
         </form>
     </dialog>
 
