@@ -2357,6 +2357,7 @@
         { name: "たからさがしの たつじん", hint: "たからばこを 20 こ あける", ok: g => g.stats.chests >= 20 },
         { name: "あるきつづける もの", hint: "5000 歩 あるく", ok: g => g.stats.steps >= 5000 },
         { name: "こつこつ がんばる ひと", hint: "がんばりのたねを 10 こ うけとる", ok: g => g.todo.redeemed.length >= 10 },
+        { name: "たよれる ゆうしゃ", hint: "3 つの なくしものを ぜんぶ とどける", ok: g => Boolean(g.flags.kazariReturned && g.flags.haneReturned && g.flags.hanaReturned) },
         { name: "ふたたびの 旅", hint: "クリアして つよくて はじめから", ok: g => (g.plus || 0) >= 1 },
         { name: "がんばりの たいじゅ", hint: "がんばりの木を たいじゅに そだてる", ok: g => g.todo.redeemed.length >= data.effortTree[data.effortTree.length - 1].count }
     ];

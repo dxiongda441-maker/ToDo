@@ -66,7 +66,9 @@
         shizuku2: { name: "ほしのしずく・みどり", key: true, text: "風の塔の てっぺんで 光っていた しずく" },
         shizuku3: { name: "ほしのしずく・あか", key: true, text: "みずうみの神殿で 光っていた しずく" },
         hoshinokanmuri: { name: "ほしのかんむり", key: true, text: "ほしくいを たおした ゆうしゃの あかし" },
-        hoshigatanokazari: { name: "ほしがたのかざり", key: true, text: "ソラの村の 子どもが なくした 星の かざり" }
+        hoshigatanokazari: { name: "ほしがたのかざり", key: true, text: "ソラの村の 子どもが なくした 星の かざり" },
+        kazamidorinohane: { name: "かざみどりのはね", key: true, text: "港町の 船から とばされた かざみどりの はね" },
+        mizuuminohana: { name: "みずうみのはな", key: true, text: "湖の神殿に さく、ねつを さげる 青い 花" }
     };
 
     // ---------- そうび ----------
