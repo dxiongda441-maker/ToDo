@@ -337,6 +337,20 @@ test("とても強くなると 弱い魔物が おそれをなす（ボス・ぴ
     assert.ok(!R.overwhelms([veteran], ["yaminokishi"]));
 });
 
+test("むずかしさ「かんたん」では 経験値と お金が 1.5 倍", () => {
+    const rng = seededRng(9);
+    const make = () => {
+        const battle = R.createBattle([R.createMember("hero", "ユウ", 1, rng)], ["pururin", "koumorin"]);
+        battle.defeated = ["pururin", "koumorin"];
+        return battle;
+    };
+    const normal = R.battleRewards(make(), rng);
+    const easy = R.battleRewards(make(), rng, 1.5);
+    assert.equal(normal.exp, 5);
+    assert.equal(easy.exp, Math.round(5 * 1.5));
+    assert.equal(easy.gold, Math.round(normal.gold * 1.5));
+});
+
 console.log("[音]");
 
 test("MML：音の高さと長さ", () => {

@@ -12,6 +12,7 @@
     const SAVE_KEY = "hoshifuru.save.v1";
     const SETTINGS_KEY = "hoshifuru.settings.v1";
     const TODO_DAILY_LIMIT = 5;
+    const EASY_RATE = 1.5; // むずかしさ「かんたん」の 経験値と お金の 倍率
 
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
@@ -25,7 +26,7 @@
 
     // ---------- 設定 ----------
     const TEXT_SPEEDS = { fast: 8, normal: 22, slow: 45 };
-    let settings = Object.assign({ textSpeed: "normal", sound: false, pad: false }, readJson(SETTINGS_KEY, {}));
+    let settings = Object.assign({ textSpeed: "normal", sound: false, pad: false, easy: false }, readJson(SETTINGS_KEY, {}));
 
     function readJson(key, fallback) {
         try {
@@ -1054,7 +1055,7 @@
         status.refresh();
 
         if (result === "win") {
-            const rewards = R.battleRewards(battle, rng);
+            const rewards = R.battleRewards(battle, rng, settings.easy ? EASY_RATE : 1);
             game.gold += rewards.gold;
             game.stats.wins += 1;
             battle.defeated.forEach(id => {
@@ -1135,7 +1136,9 @@
         await fade(async () => {
             scene = "field";
             battleView = null;
-            game.gold = Math.floor(game.gold / 2);
+            if (!settings.easy) {
+                game.gold = Math.floor(game.gold / 2);
+            }
             game.party.forEach(member => {
                 member.hp = R.maxHp(member);
                 member.mp = R.maxMp(member);
@@ -1145,7 +1148,7 @@
             const church = (town.npcs || []).find(n => n.church);
             await enterMap(game.lastTown, church ? church.x : town.entry.x, church ? church.y + 1 : town.entry.y, "up");
         });
-        await say(`「おお ${game.party[0].name}！ しんでしまうとは なさけない…」\n（おかねが はんぶんに なった）`);
+        await say(`「おお ${game.party[0].name}！ しんでしまうとは なさけない…」${settings.easy ? "" : "\n（おかねが はんぶんに なった）"}`);
         await say("「もういちど ちからを つけて、ちょうせん するのです。」");
         closeMessage();
     }
@@ -2251,6 +2254,7 @@
                 { label: "メッセージ", value: "text", right: { fast: "はやい", normal: "ふつう", slow: "おそい" }[settings.textSpeed] },
                 { label: "おと", value: "sound", right: settings.sound ? "オン" : "オフ" },
                 { label: "がめんの ボタン", value: "pad", right: settings.pad ? "だす" : "ださない" },
+                { label: "むずかしさ", value: "easy", right: settings.easy ? "かんたん" : "ふつう" },
                 { label: "タイトルへ もどる", value: "title" }
             ], { style: { left: "3%", top: "3%", minWidth: "56%" }, title: "せってい" });
             if (choice === null) {
@@ -2262,6 +2266,12 @@
                 settings.sound = !settings.sound;
             } else if (choice === "pad") {
                 settings.pad = !settings.pad;
+            } else if (choice === "easy") {
+                settings.easy = !settings.easy;
+                await say(settings.easy
+                    ? "むずかしさを「かんたん」に した。\n（経験値と お金が 1.5ばい。 全滅しても お金が へらない）"
+                    : "むずかしさを「ふつう」に した。");
+                closeMessage();
             } else if (choice === "title") {
                 if (await yesNo("冒険の書に きろくして タイトルへ もどりますか？")) {
                     saveGame();
@@ -2574,7 +2584,8 @@
             const choice = await choose([
                 { label: "メッセージ", value: "text", right: { fast: "はやい", normal: "ふつう", slow: "おそい" }[settings.textSpeed] },
                 { label: "おと", value: "sound", right: settings.sound ? "オン" : "オフ" },
-                { label: "がめんの ボタン", value: "pad", right: settings.pad ? "だす" : "ださない" }
+                { label: "がめんの ボタン", value: "pad", right: settings.pad ? "だす" : "ださない" },
+                { label: "むずかしさ", value: "easy", right: settings.easy ? "かんたん" : "ふつう" }
             ], { style: { left: "50%", top: "40%", transform: "translateX(-50%)", minWidth: "60%" }, title: "せってい" });
             if (choice === null) {
                 return;
@@ -2585,6 +2596,12 @@
                 settings.sound = !settings.sound;
             } else if (choice === "pad") {
                 settings.pad = !settings.pad;
+            } else if (choice === "easy") {
+                settings.easy = !settings.easy;
+                await say(settings.easy
+                    ? "むずかしさを「かんたん」に した。\n（経験値と お金が 1.5ばい。 全滅しても お金が へらない）"
+                    : "むずかしさを「ふつう」に した。");
+                closeMessage();
             }
             applySettings();
         }

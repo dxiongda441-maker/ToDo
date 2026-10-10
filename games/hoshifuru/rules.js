@@ -745,7 +745,8 @@
     }
 
     // 勝ったあとの経験値とゴールド。生き残った味方 ぜんいんが 同じだけ もらう
-    function battleRewards(battle, rng) {
+    // rate は「かんたん」のときの ほうびの 倍率
+    function battleRewards(battle, rng, rate = 1) {
         let exp = 0;
         let gold = 0;
         battle.defeated.forEach(id => {
@@ -753,6 +754,8 @@
             exp += def.exp;
             gold += def.gold;
         });
+        exp = Math.round(exp * rate);
+        gold = Math.round(gold * rate);
         const levelUps = [];
         battle.party.forEach((member, index) => {
             if (member.hp > 0) {
