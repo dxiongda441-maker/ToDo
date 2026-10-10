@@ -2353,6 +2353,7 @@
         { name: "たからさがしの たつじん", hint: "たからばこを 20 こ あける", ok: g => g.stats.chests >= 20 },
         { name: "あるきつづける もの", hint: "5000 歩 あるく", ok: g => g.stats.steps >= 5000 },
         { name: "こつこつ がんばる ひと", hint: "がんばりのたねを 10 こ うけとる", ok: g => g.todo.redeemed.length >= 10 },
+        { name: "ふたたびの 旅", hint: "クリアして つよくて はじめから", ok: g => (g.plus || 0) >= 1 },
         { name: "がんばりの たいじゅ", hint: "がんばりの木を たいじゅに そだてる", ok: g => g.todo.redeemed.length >= data.effortTree[data.effortTree.length - 1].count }
     ];
 
@@ -2834,13 +2835,15 @@
         if (saved) {
             const hero = saved.party[0];
             savedInfo = makeWin("info", { left: "50%", bottom: "2%", transform: "translateX(-50%)", whiteSpace: "nowrap", textAlign: "center", fontSize: "0.75em", padding: "0.2em 0.7em" });
-            savedInfo.textContent = `冒険の書：${hero.name} Lv ${hero.level}　${(MAPS[saved.map] || MAPS.sora).name}　${formatTime((saved.stats && saved.stats.playMs) || 0)}${saved.cleared ? "　★クリア" : ""}`;
+            const lap = saved.plus ? `${saved.plus + 1}しゅうめ　` : "";
+            savedInfo.textContent = `冒険の書：${lap}${hero.name} Lv ${hero.level}　${(MAPS[saved.map] || MAPS.sora).name}　${formatTime((saved.stats && saved.stats.playMs) || 0)}${saved.cleared ? "　★クリア" : ""}`;
         }
         const choice = await choose([
             { label: "はじめから", value: "new" },
-            { label: "つづきから", value: "continue", disabled: !saved },
+            { label: "つづきから", value: "continue", disabled: !saved }
+        ].concat(saved && saved.cleared ? [{ label: "つよくて はじめから", value: "plus" }] : [], [
             { label: "せってい", value: "settings" }
-        ], { style: { left: "50%", top: "58%", transform: "translateX(-50%)" }, cancel: false, start: saved ? 1 : 0 });
+        ]), { style: { left: "50%", top: "56%", transform: "translateX(-50%)" }, cancel: false, start: saved ? 1 : 0 });
         if (savedInfo) {
             savedInfo.remove();
         }
@@ -2864,6 +2867,23 @@
             await afterArrive();
             return;
         }
+        if (choice === "plus" && saved) {
+            if (!(await yesNo("いまの つよさ・どうぐ・ずかん・しょうごうを ひきついで、もういちど さいしょから 旅を しますか？\n（仲間・物語・宝箱は はじめに もどる）"))) {
+                closeMessage();
+                showTitle();
+                return;
+            }
+            closeMessage();
+            game = carryOver(saved);
+            playClock = performance.now();
+            await fade(async () => {
+                scene = "field";
+                await enterMap("sora", 5, 12, "left");
+            });
+            busy = false;
+            await afterArrive();
+            return;
+        }
         if (saved && !(await yesNo("いまの 冒険の書は きえてしまいます。 はじめから あそびますか？"))) {
             closeMessage();
             showTitle();
@@ -2879,6 +2899,33 @@
         });
         busy = false;
         await afterArrive();
+    }
+
+    // つよくて はじめから：主人公の つよさ・お金・どうぐ（だいじな物を のぞく）・ずかん・しょうごう・
+    // ToDo の がんばり・日誌・ほうびを もらった しるしを ひきつぎ、物語と 宝箱は はじめに もどす
+    function carryOver(saved) {
+        const hero = JSON.parse(JSON.stringify(saved.party[0]));
+        hero.hp = R.maxHp(hero);
+        hero.mp = R.maxMp(hero);
+        hero.poison = false;
+        const next = newGameState(hero.name);
+        next.party = [hero];
+        next.gold = saved.gold;
+        next.bag = saved.bag.filter(entry => !(data.items[entry.id] && data.items[entry.id].key));
+        next.seen = saved.seen || {};
+        next.kills = saved.kills || {};
+        next.titles = Array.isArray(saved.titles) ? saved.titles : [];
+        next.todo = saved.todo || next.todo;
+        next.stats = Object.assign(next.stats, saved.stats || {});
+        next.journal = Array.isArray(saved.journal) ? saved.journal : [];
+        next.tactic = saved.tactic;
+        next.plus = (saved.plus || 0) + 1;
+        // もう もらった ほうび（がんばりの木・はかせ・とうぎじょう）は 2 回 もらえないように 残す
+        Object.keys(saved.flags || {}).filter(flag => /^(tree|book|arena)\d+$/.test(flag)).forEach(flag => {
+            next.flags[flag] = true;
+        });
+        next.journal.push({ t: Math.round(next.stats.playMs), text: `${next.plus + 1}しゅうめの 旅が はじまった。（${hero.name} Lv ${hero.level}）` });
+        return next;
     }
 
     async function menuSettingsTitle() {
