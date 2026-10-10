@@ -23,7 +23,7 @@
 - **うつろい**（`games/utsuroi/`）：駒の動きを床の紋が決め、駒が離れるたびに床が変わる、オリジナルの 2 人用盤上ゲーム。
   説明は [`games/utsuroi/README.md`](games/utsuroi/README.md)。
 - **ほしふるクエスト**（`games/hoshifuru/`）：レベルを上げて強くなる、ドット絵のロールプレイングゲーム。
-  ToDo で終えたタスクが、ゲームの中で能力を上げる「がんばりのたね」になる。説明は [`games/hoshifuru/README.md`](games/hoshifuru/README.md)。
+  ToDo で終えたタスクと集中タイマーの集中が、ゲームの中で能力を上げる「がんばりのたね」になる。説明は [`games/hoshifuru/README.md`](games/hoshifuru/README.md)。
 
 ## 保存データ
 

@@ -2299,6 +2299,15 @@
                 ids.push(record.id);
             }
         });
+        // 集中タイマー（ポモドーロ）で 集中しきった 回数も がんばりに 数える
+        const focus = readJson("todo.focus.v1", null);
+        const days = focus && focus.days && typeof focus.days === "object" ? focus.days : {};
+        Object.entries(days).forEach(([day, record]) => {
+            const sessions = Math.min(50, Number(record && record.sessions) || 0);
+            for (let i = 1; i <= sessions; i += 1) {
+                ids.push(`focus:${day}:${i}`);
+            }
+        });
         return Array.from(new Set(ids));
     }
 
@@ -2317,11 +2326,17 @@
             return;
         }
         busy = true;
+        if (!R.addItem(game.bag, "ganbarinotane", count)) {
+            // ふくろが いっぱいなら 受け取らずに おいておく（つぎに 町へ 入ったときに とどく）
+            await say("がんばりのたねが とどいたが、どうぐぶくろが いっぱいで うけとれなかった…");
+            closeMessage();
+            busy = false;
+            return;
+        }
         fresh.slice(0, count).forEach(id => game.todo.redeemed.push(id));
         game.todo.today += count;
-        R.addItem(game.bag, "ganbarinotane", count);
         audio.jingle("item");
-        await say(`ToDo で かたづけた ${count}この がんばりが、\n『がんばりのたね』に なって とどいた！（1日 ${TODO_DAILY_LIMIT}こ まで）`);
+        await say(`ToDo で がんばった ${count}この 成果が、\n『がんばりのたね』に なって とどいた！（1日 ${TODO_DAILY_LIMIT}こ まで）`);
         closeMessage();
         saveGame();
         busy = false;

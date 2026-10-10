@@ -241,11 +241,12 @@ async function checkHubAndRpg(browser, width) {
         localStorage.clear();
         localStorage.setItem("todo.tasks.v1", JSON.stringify([{ id: "hub-1", text: "Done", completed: true, createdAt: 1700000000000 }]));
         localStorage.setItem("utsuroi.record.v1", JSON.stringify({ easy: { win: 2, loss: 1, draw: 0 } }));
+        localStorage.setItem("todo.focus.v1", JSON.stringify({ days: { "2026-01-02": { sessions: 2, minutes: 50 } } }));
     });
     await page.reload();
     check((await page.$$(".card .play")).length === 2, "ゲーム一覧に 2 つのゲームがある");
     check((await page.textContent("#utsuroi-progress")).includes("2 勝 1 敗"), "うつろいの戦績が出る");
-    check((await page.textContent("#seeds")).includes("1 件"), "がんばりのたねに なる タスクの数が出る");
+    check((await page.textContent("#seeds")).includes("3 件"), "がんばりのたねに なる 数（終えたタスク ＋ 集中した回数）が出る");
     let scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     check(scrollWidth <= width, `ゲーム一覧が 横にはみ出さない（${scrollWidth}px）`);
     await checkAccessibility(page, "ゲーム一覧");

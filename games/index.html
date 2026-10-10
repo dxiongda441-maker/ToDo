@@ -159,7 +159,7 @@
         </div>
 
         <p class="seeds" id="seeds">
-            ToDo で 終えたタスクは、ほしふるクエストの どうぐ「がんばりのたね」に なります（1 日 5 個まで。村に入ると 受け取れます）。
+            ToDo で 終えたタスクと、集中タイマーで 集中しきった 回数は、ほしふるクエストの どうぐ「がんばりのたね」に なります（1 日 5 個まで。町に入ると 受け取れます）。
         </p>
 
         <p class="back"><a href="../index.html">← ToDo アプリに戻る</a></p>
@@ -229,11 +229,19 @@
             const done = new Set();
             (Array.isArray(tasks) ? tasks : []).forEach(task => task && task.completed && done.add(task.id));
             (Array.isArray(archive) ? archive : []).forEach(item => item && (item.completed || item.reason === "cleared") && done.add(item.id));
+            // 集中タイマーで 集中しきった 回数も たねに なる（ほしふるクエストの game.js と 同じ 数え方）
+            const focus = read("todo.focus.v1", null);
+            Object.entries(focus && focus.days && typeof focus.days === "object" ? focus.days : {}).forEach(([day, record]) => {
+                const sessions = Math.min(50, Number(record && record.sessions) || 0);
+                for (let i = 1; i <= sessions; i += 1) {
+                    done.add(`focus:${day}:${i}`);
+                }
+            });
             const redeemed = new Set(save && save.todo && Array.isArray(save.todo.redeemed) ? save.todo.redeemed : []);
             const waiting = Array.from(done).filter(id => !redeemed.has(id)).length;
             if (waiting > 0) {
                 const note = document.createElement("strong");
-                note.textContent = ` いま たねに なるのを まっている タスク：${waiting} 件`;
+                note.textContent = ` いま たねに なるのを まっている がんばり：${waiting} 件`;
                 document.getElementById("seeds").append(note);
             }
         })();
