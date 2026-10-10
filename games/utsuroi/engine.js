@@ -158,7 +158,12 @@ function createUtsuroiEngine() {
         throw new Error("Could not generate a board");
     }
 
-    function newGame(seed) {
+    // 駒落ち（ハンデ）で取り除く石の順番：端から内側へ
+    const HANDICAP_COLUMNS = [0, 6, 1, 5, 2, 4];
+    const MAX_HANDICAP = 3;
+
+    // options.handicap = { side: BLACK|WHITE, stones: 0〜3 }：side の石を最初から減らす
+    function newGame(seed, options = {}) {
         const actualSeed = seed || randomSeed();
         const tiles = generateTiles(actualSeed);
         const board = new Int8Array(CELLS);
@@ -168,6 +173,18 @@ function createUtsuroiEngine() {
             board[homeRow(BLACK) * SIZE + c] = c === middle ? BLACK * KING : BLACK * STONE;
         }
 
+        const handicap = options.handicap || null;
+        let handicapInfo = null;
+        if (handicap && (handicap.side === BLACK || handicap.side === WHITE)) {
+            const stones = Math.max(0, Math.min(MAX_HANDICAP, Math.floor(Number(handicap.stones) || 0)));
+            for (let k = 0; k < stones; k += 1) {
+                board[homeRow(handicap.side) * SIZE + HANDICAP_COLUMNS[k]] = 0;
+            }
+            if (stones > 0) {
+                handicapInfo = { side: handicap.side, stones };
+            }
+        }
+
         return {
             seed: actualSeed,
             tiles: Array.from(tiles),
@@ -175,8 +192,18 @@ function createUtsuroiEngine() {
             turn: BLACK,
             ply: 0,
             result: null,
-            lastMove: null
+            lastMove: null,
+            handicap: handicapInfo,
+            startBlack: countPieces(board, BLACK),
+            startWhite: countPieces(board, WHITE)
         };
+    }
+
+    // 取られた駒の数（駒落ちの分は数えない）
+    function lostPieces(position, side) {
+        const start = side === BLACK ? position.startBlack : position.startWhite;
+        const initial = typeof start === "number" ? start : SIZE;
+        return initial - countPieces(position.board, side);
     }
 
     function clonePosition(position) {
@@ -187,7 +214,10 @@ function createUtsuroiEngine() {
             turn: position.turn,
             ply: position.ply,
             result: position.result ? Object.assign({}, position.result) : null,
-            lastMove: position.lastMove ? Object.assign({}, position.lastMove) : null
+            lastMove: position.lastMove ? Object.assign({}, position.lastMove) : null,
+            handicap: position.handicap ? Object.assign({}, position.handicap) : null,
+            startBlack: position.startBlack,
+            startWhite: position.startWhite
         };
     }
 
@@ -286,10 +316,11 @@ function createUtsuroiEngine() {
         } else if (isArrival(piece, mover, move.to)) {
             next.result = { winner: mover, reason: "arrival" };
         } else if (next.ply >= MAX_PLY) {
-            const mine = countPieces(next.board, mover);
-            const theirs = countPieces(next.board, -mover);
+            // 取られた駒が少ない方の勝ち（駒落ちがなければ「残りの駒が多い方」と同じ）
+            const lostMine = lostPieces(next, mover);
+            const lostTheirs = lostPieces(next, -mover);
             next.result = {
-                winner: mine === theirs ? 0 : (mine > theirs ? mover : -mover),
+                winner: lostMine === lostTheirs ? 0 : (lostMine < lostTheirs ? mover : -mover),
                 reason: "limit"
             };
         } else if (legalMoves(next).length === 0) {
@@ -376,6 +407,8 @@ function createUtsuroiEngine() {
         const board = Int8Array.from(position.board);
         const tiles = Int8Array.from(position.tiles);
         const weights = Object.assign({}, DEFAULT_WEIGHTS, options.weights || {});
+        const startBlack = typeof position.startBlack === "number" ? position.startBlack : SIZE;
+        const startWhite = typeof position.startWhite === "number" ? position.startWhite : SIZE;
         let side = position.turn;
         let h1 = 0;
         let h2 = 0;
@@ -575,19 +608,23 @@ function createUtsuroiEngine() {
         }
 
         function limitScore(ply) {
-            let mine = 0;
-            let theirs = 0;
+            let black = 0;
+            let white = 0;
             for (let i = 0; i < CELLS; i += 1) {
-                if (board[i] * side > 0) {
-                    mine += 1;
-                } else if (board[i] !== 0) {
-                    theirs += 1;
+                if (board[i] > 0) {
+                    black += 1;
+                } else if (board[i] < 0) {
+                    white += 1;
                 }
             }
-            if (mine === theirs) {
+            // 取られた駒が少ない方の勝ち
+            const lostBlack = startBlack - black;
+            const lostWhite = startWhite - white;
+            if (lostBlack === lostWhite) {
                 return 0;
             }
-            return mine > theirs ? WIN - ply : -(WIN - ply);
+            const blackWins = lostBlack < lostWhite;
+            return (blackWins === (side === BLACK)) ? WIN - ply : -(WIN - ply);
         }
 
         function orderMoves(moves, scores, count, ply, ttBest) {
@@ -960,8 +997,9 @@ function createUtsuroiEngine() {
         }
         clearTable();
         const reply = chooseMove(position, Object.assign({ level: "hard", timeMs: 600 }, options, { noise: 0 }));
-        // reply.score は後手（手番側）から見た点数。マイナスなら先手側が有利
-        return Boolean(reply) && reply.score < -20;
+        // reply.score は後手（手番側）から見た点数。マイナスなら先手側が有利。
+        // 先手が最善に近い手を指すと -8〜-22 ほどになり、ゆるい手だとプラスになる（自己対局で確認）
+        return Boolean(reply) && reply.score < -8;
     }
 
     return {
@@ -994,7 +1032,9 @@ function createUtsuroiEngine() {
         seedToCode,
         codeToSeed,
         randomSeed,
-        countPieces
+        countPieces,
+        lostPieces,
+        MAX_HANDICAP
     };
 }
 

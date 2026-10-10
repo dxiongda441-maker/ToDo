@@ -60,7 +60,7 @@
     }
 
     // ---------- 状態 ----------
-    const defaultSettings = { mode: "cpu", level: "normal", side: "black", swap: true };
+    const defaultSettings = { mode: "cpu", level: "normal", side: "black", swap: true, handicap: "none" };
     let settings = Object.assign({}, defaultSettings, load(SETTINGS_KEY, {}));
 
     const game = {
@@ -71,6 +71,7 @@
         human: BLACK, // いま人が持っている色（入れ替えで変わる）
         names: { [BLACK]: "プレイヤー1", [WHITE]: "プレイヤー2" }, // 2 人対戦のときの名前
         swapTaken: null, // null: まだ決めていない / true / false
+        handicap: null, // 駒落ち { side, stones } または null
         history: [], // 局面の列（history[0] が初期局面）
         moves: [], // 指した手 [from, to]
         selected: null,
@@ -280,7 +281,8 @@
         const thinking = game.thinking && position.turn === side
             ? '<span class="thinking">考え中…</span>'
             : "";
-        return `<span class="strip-name"><span class="mini-piece mini-piece--${side === BLACK ? "black" : "white"}"></span>${SIDE_NAME[side]}・${playerLabel(side)}</span>${thinking}<span class="strip-count">駒 ${count}</span>`;
+        const handicap = game.handicap && game.handicap.side === side ? `（${game.handicap.stones} 枚落ち）` : "";
+        return `<span class="strip-name"><span class="mini-piece mini-piece--${side === BLACK ? "black" : "white"}"></span>${SIDE_NAME[side]}・${playerLabel(side)}</span>${thinking}<span class="strip-count">駒 ${count}${handicap}</span>`;
     }
 
     function renderStrips() {
@@ -635,9 +637,9 @@ self.onmessage = event => {
             stalemate: "相手は動ける手がなくなりました。",
             limit: (() => {
                 const position = current();
-                const black = E.countPieces(position.board, BLACK);
-                const white = E.countPieces(position.board, WHITE);
-                return `${MAX_PLY} 手に達しました。残りの駒は 黒 ${black}・白 ${white}。`;
+                const black = E.lostPieces(position, BLACK);
+                const white = E.lostPieces(position, WHITE);
+                return `${MAX_PLY} 手に達しました。取られた駒は 黒 ${black}・白 ${white}。`;
             })()
         };
         if (result.winner === 0) {
@@ -653,7 +655,7 @@ self.onmessage = event => {
     function finishGame() {
         const position = current();
         const result = position.result;
-        if (game.mode === "cpu" && !game.recorded) {
+        if (game.mode === "cpu" && !game.recorded && !game.handicap) {
             const record = load(RECORD_KEY, {});
             const r = record[game.level] || { win: 0, loss: 0, draw: 0 };
             if (result.winner === 0) {
@@ -702,16 +704,54 @@ self.onmessage = event => {
         return BLACK;
     }
 
+    // 設定の値（"cpu:2" / "you:1" / "black:3" / "white:1" / "none"）を { side, stones } にする
+    function resolveHandicap(choice, mode, human) {
+        const match = /^(cpu|you|black|white):([1-3])$/.exec(choice || "");
+        if (!match) {
+            return null;
+        }
+        const stones = Number(match[2]);
+        let side;
+        if (match[1] === "cpu" || match[1] === "you") {
+            if (mode !== "cpu") {
+                return null;
+            }
+            side = match[1] === "you" ? human : -human;
+        } else {
+            if (mode !== "local") {
+                return null;
+            }
+            side = match[1] === "black" ? BLACK : WHITE;
+        }
+        return { side, stones };
+    }
+
+    function handicapOptions(mode) {
+        const options = [["none", "なし"]];
+        if (mode === "cpu") {
+            [1, 2, 3].forEach(n => options.push([`cpu:${n}`, `CPU の石を ${n} 枚減らす`]));
+            [1, 2, 3].forEach(n => options.push([`you:${n}`, `あなたの石を ${n} 枚減らす`]));
+        } else {
+            [1, 2, 3].forEach(n => options.push([`black:${n}`, `黒の石を ${n} 枚減らす`]));
+            [1, 2, 3].forEach(n => options.push([`white:${n}`, `白の石を ${n} 枚減らす`]));
+        }
+        return options;
+    }
+
     function resetGameState(options) {
         game.token += 1;
         game.mode = options.mode === "local" ? "local" : "cpu";
         game.level = E.LEVELS[options.level] ? options.level : "normal";
-        game.swapEnabled = options.swap !== false;
         game.startHuman = options.startHuman !== undefined ? options.startHuman : resolveSide(options.side);
         game.human = game.startHuman;
+        game.handicap = options.resolvedHandicap !== undefined
+            ? options.resolvedHandicap
+            : resolveHandicap(options.handicap, game.mode, game.human);
+        // 駒落ちはわざと条件を変えるので、入れ替えルールとは組み合わせない
+        game.swapEnabled = options.swap !== false && !game.handicap;
         game.names = { [BLACK]: "プレイヤー1", [WHITE]: "プレイヤー2" };
         game.swapTaken = null;
-        game.history = [E.newGame(options.seed || null)];
+        game.history = [E.newGame(options.seed || null, { handicap: game.handicap })];
         game.moves = [];
         game.selected = null;
         game.hint = null;
@@ -805,6 +845,7 @@ self.onmessage = event => {
             level: game.level,
             swapEnabled: game.swapEnabled,
             startHuman: game.startHuman,
+            handicap: game.handicap,
             swapTaken: game.swapTaken,
             recorded: game.recorded
         });
@@ -821,6 +862,9 @@ self.onmessage = event => {
                 level: saved.level,
                 swap: saved.swapEnabled,
                 startHuman: saved.startHuman === WHITE ? WHITE : BLACK,
+                resolvedHandicap: saved.handicap && (saved.handicap.side === BLACK || saved.handicap.side === WHITE)
+                    ? { side: saved.handicap.side, stones: Number(saved.handicap.stones) || 0 }
+                    : null,
                 seed: saved.seed
             });
             saved.moves.forEach(([from, to], i) => {
@@ -844,14 +888,29 @@ self.onmessage = event => {
         setupForm.elements.level.value = settings.level;
         setupForm.elements.side.value = settings.side;
         setupForm.elements.swap.checked = settings.swap;
+        fillHandicapOptions(settings.mode, settings.handicap);
         setupForm.elements.code.value = "";
         setupError.hidden = true;
         updateSetupVisibility();
         setupDialog.showModal();
     }
 
-    function updateSetupVisibility() {
-        const cpu = setupForm.elements.mode.value === "cpu";
+    function fillHandicapOptions(mode, selected) {
+        const select = setupForm.elements.handicap;
+        const options = handicapOptions(mode);
+        select.innerHTML = options.map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
+        select.value = options.some(([value]) => value === selected) ? selected : "none";
+    }
+
+    function updateSetupVisibility(event) {
+        const mode = setupForm.elements.mode.value;
+        const cpu = mode === "cpu";
+        if (event && event.target && event.target.name === "mode") {
+            fillHandicapOptions(mode, "none");
+        }
+        const handicapOn = setupForm.elements.handicap.value !== "none";
+        setupForm.elements.swap.disabled = handicapOn;
+        $("#handicap-note").hidden = !handicapOn;
         $("#cpu-options").disabled = !cpu;
         $("#side-options").disabled = !cpu;
         $("#cpu-options").hidden = !cpu;
@@ -876,7 +935,8 @@ self.onmessage = event => {
             mode: setupForm.elements.mode.value,
             level: setupForm.elements.level.value,
             side: setupForm.elements.side.value,
-            swap: setupForm.elements.swap.checked
+            swap: setupForm.elements.swap.checked,
+            handicap: setupForm.elements.handicap.value
         };
         save(SETTINGS_KEY, settings);
         startGame(Object.assign({}, settings, { seed }));

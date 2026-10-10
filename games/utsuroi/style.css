@@ -746,6 +746,13 @@ input {
     text-transform: uppercase;
 }
 
+.select-input {
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface-2);
+}
+
 .error {
     color: var(--danger);
     margin: -6px 0 12px;

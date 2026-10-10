@@ -229,6 +229,36 @@ test(`${MAX_PLY} 手で駒の多い方が勝ち・同数なら引き分け`, () 
     assert.deepEqual(E.applyMove(even, { from: at(3, 0), to: at(2, 0) }).result, { winner: 0, reason: "limit" });
 });
 
+test("駒落ち：指定した側の石を端から減らす（王は残る）", () => {
+    const p = E.newGame(11, { handicap: { side: WHITE, stones: 2 } });
+    assert.equal(E.countPieces(p.board, WHITE), 5);
+    assert.equal(E.countPieces(p.board, BLACK), 7);
+    assert.equal(p.board[at(0, 0)], 0);
+    assert.equal(p.board[at(0, 6)], 0);
+    assert.equal(p.board[at(0, 3)], WHITE * KING);
+    assert.deepEqual(p.handicap, { side: WHITE, stones: 2 });
+    assert.equal(E.newGame(11, { handicap: { side: BLACK, stones: 9 } }).startBlack, 7 - E.MAX_HANDICAP);
+    assert.equal(E.newGame(11, { handicap: { side: BLACK, stones: 0 } }).handicap, null);
+});
+
+test("駒落ちがあっても、手数切れは「取られた駒が少ない方」の勝ち", () => {
+    // 白は 3 枚落ち（開始 4 枚）。黒は 2 枚、白は 1 枚取られた状態で 100 手 → 白の勝ち
+    const start = E.newGame(5, { handicap: { side: WHITE, stones: 3 } });
+    const p = makePosition({
+        pieces: {
+            [at(6, 3)]: BLACK * KING, [at(6, 0)]: STONE, [at(6, 1)]: STONE, [at(6, 2)]: STONE, [at(5, 5)]: STONE,
+            [at(0, 3)]: WHITE * KING, [at(0, 4)]: -STONE, [at(0, 5)]: -STONE
+        },
+        ply: MAX_PLY - 1
+    });
+    p.startBlack = start.startBlack;
+    p.startWhite = start.startWhite;
+    const next = E.applyMove(p, { from: at(5, 5), to: at(4, 5) });
+    assert.equal(E.lostPieces(next, BLACK), 2);
+    assert.equal(E.lostPieces(next, WHITE), 1);
+    assert.deepEqual(next.result, { winner: WHITE, reason: "limit" });
+});
+
 test("相手が動けなくなったら勝ち", () => {
     // 盤をほぼ白の石で埋めた形（探索で見つけた局面）。黒の王が g7 の石を取ると、
     // 白の駒はどれも味方の駒にふさがれて 1 手も指せなくなる

@@ -121,6 +121,12 @@
             </label>
 
             <label class="field">
+                <span><strong>駒落ち（ハンデ）</strong> <span class="muted small">実力に差があるとき、強い方の石を最初から減らします</span></span>
+                <select name="handicap" class="select-input"></select>
+                <span class="muted small" id="handicap-note">駒落ちのときは入れ替えルールを使いません。CPU との戦績にも記録しません。</span>
+            </label>
+
+            <label class="field">
                 <span>盤面コード（空なら新しい盤）</span>
                 <input type="text" name="code" class="code-input" placeholder="例：K3Z9QA" autocomplete="off" spellcheck="false" maxlength="7">
             </label>
@@ -162,7 +168,7 @@
     <!-- ルール -->
     <dialog id="rules-dialog" class="dialog dialog--wide">
         <div class="dialog-body rules">
-            <h2>うつろいのルール</h2>
+            <h2 tabindex="-1" autofocus>うつろいのルール</h2>
 
             <h3>1. ねらい</h3>
             <p>相手の<strong>王</strong>を取るか、自分の王を相手の<strong>玉座</strong>（相手の王が最初にいたマス）に進めたら勝ち。</p>
@@ -187,7 +193,10 @@
             </ul>
 
             <h3>5. 決着しないとき</h3>
-            <p>両者あわせて <strong id="rules-max-ply"></strong> 手に達したら、盤に残る駒（王も含む）が多い方の勝ち。同じなら引き分け。手番で動ける手が 1 つもない側は負けです。</p>
+            <p>両者あわせて <strong id="rules-max-ply"></strong> 手に達したら、<strong>取られた駒が少ない方</strong>の勝ち。同じなら引き分け。手番で動ける手が 1 つもない側は負けです。</p>
+
+            <h3>6. 実力差があるときは駒落ち</h3>
+            <p>「新しい対局」で駒落ちを選ぶと、強い方の石を 1〜3 枚減らして始められます（端の石から減ります）。初心者と経験者、親子でも、いい勝負になるように調整できます。</p>
 
             <div class="dialog-actions">
                 <button type="button" class="primary" data-close>閉じる</button>
