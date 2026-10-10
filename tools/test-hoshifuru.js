@@ -12,6 +12,7 @@ const dir = path.join(__dirname, "..", "games", "hoshifuru");
 const data = require(path.join(dir, "data.js"));
 const R = require(path.join(dir, "rules.js"));
 const { maps, shops, gates } = require(path.join(dir, "maps.js"));
+const audio = require(path.join(dir, "audio.js"));
 
 let failed = 0;
 function test(name, fn) {
@@ -302,6 +303,30 @@ test("どうぐ：袋の出し入れと 売値", () => {
     assert.ok(!R.removeItem(bag, "yakusou", 5));
     assert.equal(R.sellPrice("yakusou"), 4);
     assert.equal(R.sellPrice("shizuku1"), 0);
+});
+
+console.log("[音]");
+
+test("MML：音の高さと長さ", () => {
+    const { notes, beats } = audio.parseMml("o4 a4 r8 >c8. [e16]2");
+    assert.equal(notes.length, 4);
+    assert.equal(notes[0].freq, 440);
+    assert.equal(Math.round(notes[1].freq), 523);
+    assert.equal(notes[1].at, 1.5);
+    assert.equal(notes[1].beats, 0.75);
+    assert.equal(beats, 1 + 0.5 + 0.75 + 0.5);
+});
+
+test("くり返す曲は どのパートも同じ長さ・場所と戦闘の曲が そろっている", () => {
+    for (const [name, track] of Object.entries(audio.tracks)) {
+        if (track.loop) {
+            track.voices.forEach((voice, i) => assert.equal(voice.beats, track.beats, `${name} のパート ${i + 1}`));
+        }
+        track.voices.forEach(voice => voice.notes.forEach(note => assert.ok(note.freq > 50 && note.freq < 3000, `${name} の音が 高すぎる・低すぎる`)));
+    }
+    const wanted = new Set(["title", "battle", "boss", "ending", "victory", "levelup", "item", "join", "inn"]);
+    Object.values(maps).forEach(map => map.music && wanted.add(map.music));
+    wanted.forEach(name => assert.ok(audio.tracks[name], `曲 ${name} がない`));
 });
 
 console.log();
