@@ -47,5 +47,21 @@ else
   ng "ゲームのテストが失敗した（node tools/test-utsuroi.js で詳細）"
 fi
 
+echo "[RPG（games/hoshifuru）のファイルと文法]"
+for f in $(grep -o 'src="[^"#:]*\.js"' games/hoshifuru/index.html | sed 's/.*="\(.*\)"/\1/'); do
+  [ -f "games/hoshifuru/$f" ] && ok "games/hoshifuru/$f" || ng "games/hoshifuru/$f が無い"
+done
+for f in games/hoshifuru/*.js; do
+  node --check "$f" 2>/dev/null && ok "$f" || ng "$f に文法エラーがある"
+done
+
+echo "[RPG のマップ・データ・ルールのテスト]"
+if rpg_output=$(node tools/test-hoshifuru.js 2>&1); then
+  ok "node tools/test-hoshifuru.js"
+else
+  echo "$rpg_output"
+  ng "RPG のテストが失敗した（node tools/test-hoshifuru.js で詳細）"
+fi
+
 echo
 if [ "$FAIL" -eq 0 ]; then echo "すべて OK"; else echo "NG があります"; exit 1; fi
