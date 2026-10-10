@@ -448,6 +448,8 @@ function createUtsuroiEngine() {
         const historyScores = new Int32Array(64 * 64);
         const basePly = position.ply;
         const deadline = options.deadline || Infinity;
+        // 後半の静かな手（駒を取らない手）を 1 段浅く読み、良さそうなときだけ読み直す
+        const useReductions = Boolean(options.reductions);
         let nodes = 0;
         let stopped = false;
 
@@ -810,7 +812,14 @@ function createUtsuroiEngine() {
                     score = -negamax(depth - 1, -beta, -alpha, ply + 1);
                 } else {
                     // 2 手目以降はまず狭い窓で調べ、良さそうなときだけ調べ直す
-                    score = -negamax(depth - 1, -alpha - 1, -alpha, ply + 1);
+                    const reduce = useReductions && depth >= 3 && i >= 3 && captured === 0
+                        && move !== killers[ply * 2] && move !== killers[ply * 2 + 1]
+                        ? (i >= 8 ? 2 : 1)
+                        : 0;
+                    score = -negamax(depth - 1 - reduce, -alpha - 1, -alpha, ply + 1);
+                    if (reduce > 0 && score > alpha) {
+                        score = -negamax(depth - 1, -alpha - 1, -alpha, ply + 1);
+                    }
                     if (score > alpha && score < beta) {
                         score = -negamax(depth - 1, -beta, -alpha, ply + 1);
                     }
@@ -949,7 +958,7 @@ function createUtsuroiEngine() {
         easy: { depth: 1, timeMs: 300, noise: 90, label: "やさしい" },
         casual: { depth: 2, timeMs: 500, noise: 45, label: "すこし手ごわい" },
         normal: { depth: 3, timeMs: 800, noise: 18, label: "ふつう" },
-        hard: { depth: 30, timeMs: 1500, noise: 0, label: "つよい" }
+        hard: { depth: 30, timeMs: 1500, noise: 0, label: "つよい", reductions: true }
     };
 
     // options: { level, depth, timeMs, noise, weights, random }
@@ -966,7 +975,8 @@ function createUtsuroiEngine() {
         const started = Date.now();
         const searcher = createSearcher(position, {
             deadline: started + timeMs,
-            weights: options.weights
+            weights: options.weights,
+            reductions: options.reductions !== undefined ? options.reductions : level.reductions
         });
 
         let result;
