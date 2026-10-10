@@ -251,6 +251,13 @@ test("とうぎじょう と まものはかせ：魔物・ほうびが 実在�
     assert.ok(people.some(npc => npc.arena) && people.some(npc => npc.scholar));
 });
 
+test("なかまとの 会話：場所は 実在し、せりふは 文字", () => {
+    Object.entries(data.partyTalk).forEach(([mapId, entries]) => {
+        assert.ok(maps[mapId], mapId);
+        entries.forEach(entry => ["mage", "priest"].forEach(cls => assert.equal(typeof entry[cls], "string", `${mapId} ${cls}`)));
+    });
+});
+
 console.log("[ルール]");
 
 test("必要な経験値は レベルごとに増え、成長で能力が下がらない", () => {

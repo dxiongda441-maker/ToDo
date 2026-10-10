@@ -1686,6 +1686,7 @@
                 { label: "つよさ", value: "status" },
                 { label: "ちず", value: "map" },
                 { label: "きろく", value: "records" },
+                { label: "はなす", value: "talk" },
                 { label: "せってい", value: "settings" }
             ], { style: { left: "3%", top: "3%" }, cols: 2 });
             if (choice === null) {
@@ -1701,6 +1702,8 @@
                 await menuStatus();
             } else if (choice === "map") {
                 await menuMap();
+            } else if (choice === "talk") {
+                await partyChat();
             } else if (choice === "records") {
                 await menuRecords();
             } else if (choice === "settings") {
@@ -2034,6 +2037,33 @@
                 await journalView();
             }
         }
+    }
+
+    // なかまと はなす（いる場所と 進み具合で せりふが かわる）
+    async function partyChat() {
+        const friends = game.party.slice(1);
+        if (friends.length === 0) {
+            await say(`${game.party[0].name}は ひとりごとを いってみた。\n…へんじは ない。 はやく なかまが ほしい。`);
+            return;
+        }
+        const entries = data.partyTalk[game.map] || [];
+        const entry = entries.find(e => (!e.if || game.flags[e.if]) && (!e.unless || !game.flags[e.unless]));
+        const lines = [];
+        friends.forEach(member => {
+            // つかれている 仲間は まず そう言う
+            const line = member.hp <= 0
+                ? ""
+                : member.hp < R.maxHp(member) / 3
+                    ? "ちょっと つかれちゃった… どこかで やすみたいな。"
+                    : entry && entry[member.cls];
+            if (line) {
+                lines.push(`${member.name}「${line}」`);
+            }
+        });
+        if (lines.length === 0) {
+            lines.push(friends.some(m => m.hp <= 0) ? "（たおれた なかまを はやく いきかえらせよう）" : `${friends[0].name}「いっしょに がんばろうね！」`);
+        }
+        await sayAll(lines);
     }
 
     // つぎに どこへ 行けば いいか（フラグから 決める）。place は 世界地図の 記号

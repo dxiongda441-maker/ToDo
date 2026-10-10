@@ -122,6 +122,7 @@ canvas {
 }
 
 .message {
+    background: rgba(0, 0, 0, 0.96); /* 下の ウィンドウの 文字が すけて 読みにくく ならないように */
     left: 3%;
     right: 3%;
     bottom: 3%;

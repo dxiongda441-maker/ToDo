@@ -205,7 +205,49 @@
         { count: "all", flag: "book4", items: [["ganbarinotane", 5]] }
     ];
 
-    const data = { classes, spells, items, equipment, enemies, skills, zones, arena, bookRewards };
+    // なかまとの 会話（メニューの「はなす」）。いる場所（maps.js の id）ごとに、上から 順に 条件に あう ものを 使う
+    // if / unless は フラグ。mage は ルナ、priest は ミントの せりふ
+    const partyTalk = {
+        sora: [
+            { if: "cleared", mage: "星の ある 夜空って、こんなに きれいだったんだね。", priest: "村の みなさん、とても うれしそうです。" },
+            { mage: "ここが あなたの ふるさと？ のどかで いい村ね。", priest: "長老さまに あいさつを していきましょうか。" }
+        ],
+        marine: [
+            { unless: "arena1", mage: "とうぎじょう、ちょっと きょうみ あるかも。 力だめしに なりそう！", priest: "けがを しても、教会が ありますから だいじょうぶですよ。" },
+            { mage: "海の においって すき。 星が もどったら 船で 旅もしてみたいな。", priest: "港は にぎやかですね。 森とは ぜんぜん ちがいます。" }
+        ],
+        leaf: [
+            { mage: "森の 空気って すんでるね。 じゅもんの とおりも いい気が する。", priest: "ここが わたしの ふるさとです。 みんな 元気そうで よかった。" }
+        ],
+        cave1: [{ mage: "まっくら… ひのこで てらしたいけど、MP は とっておかなきゃ。", priest: "足もとに 気をつけて くださいね。" }],
+        cave2: [{ mage: "ここが あなたが 最初に しずくを 見つけた ところ？ すごいね。", priest: "ここで ひとりで 戦ったのですか…？" }],
+        tower1: [{ mage: "風が 強い… 帽子が とばされそう！", priest: "上へ 上へ。 しずくの 気配が します。" }],
+        tower2: [{ mage: "まだ 上が あるの？ もう 足が パンパンだよ…", priest: "あと すこしです。 がんばりましょう。" }],
+        tower3: [{ mage: "てっぺんだ！ 空が ちかい…", priest: "なにか 大きな ものが いる 気配が します。" }],
+        shrine1: [{ mage: "水の 音が きれい。 でも 魔物は かわいくない。", priest: "この神殿は、むかし 星を まつっていたそうです。" }],
+        shrine2: [{ mage: "湖の そこから なにかが 見てる…", priest: "さいごの しずくは きっと この 先です。" }],
+        castle1: [{ mage: "ここが かげの城… こわくなんか ないんだから！", priest: "しずくの 光が、わたしたちを まもってくれています。" }],
+        castle2: [{ mage: "いやな 気配が どんどん 強くなる。", priest: "MP は だいじょうぶですか？ ふっかつのはねも わすれずに。" }],
+        castle3: [
+            { if: "bossFinal", mage: "ほんとうに 勝ったんだね、わたしたち。", priest: "星の 光が もどってきます…" },
+            { mage: "この 先に かげの王が…！", priest: "みんなで 力を あわせれば、きっと だいじょうぶです。" }
+        ],
+        ruins1: [{ mage: "星の 遺跡… じゅもんの 本で 読んだことが ある！", priest: "ここの 魔物は とても 強いです。 むりは しないで。" }],
+        ruins2: [{ mage: "かべに 星の もようが ある。 きれい…", priest: "ふかい 祈りの 気配が します。" }],
+        ruins3: [
+            { if: "bossStar", mage: "ほしくいまで たおしちゃった！ わたしたち、さいきょうかも！", priest: "これで 星たちも あんしんして ひかれますね。" },
+            { mage: "ほしくい… 星を たべる 魔物。 ぜったいに 止めなきゃ。", priest: "ここまで きた わたしたちなら、きっと。" }
+        ],
+        world: [
+            { if: "cleared", mage: "つぎは どこへ 行く？ まだ 見てない 魔物も いるかも。", priest: "とうぎじょうや ずかん あつめも たのしそうですね。" },
+            { if: "shizuku3", mage: "湖に 光の橋！ いよいよ かげの城だね。", priest: "準備は ととのいましたか？" },
+            { if: "joinedMint", mage: "東の 湖の神殿だっけ？ ミント、道 わかる？", priest: "はい。 東の はずれです。 ついてきてください。" },
+            { if: "shizuku2", mage: "北の 山の 結界が とけたはず。 森の村は 北東だよ。", priest: "" },
+            { mage: "風の塔は 港町の 北の さばくに あるって。", priest: "" }
+        ]
+    };
+
+    const data = { classes, spells, items, equipment, enemies, skills, zones, arena, bookRewards, partyTalk };
 
     const HF = root.HF = root.HF || {};
     HF.data = data;
