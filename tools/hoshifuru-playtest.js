@@ -381,6 +381,7 @@ function check(condition, label) {
     check((await state()).map === "ruins1", "星のせいれいに 星の遺跡へ つれていってもらえる");
     // おまけのボスは 運しだいで 負けるので、がんばりのたねを たくさん 食べたことにして 確実に 勝てるようにする
     await page.evaluate(() => {
+        HF.debug.setAutoBattle(true); // 読み直したので もう一度 オンにする
         HF.debug.setLevel(30);
         HF.debug.game.party.forEach(member => {
             Object.assign(member.bonus, { hp: 300, str: 80, def: 80, agi: 40 });
