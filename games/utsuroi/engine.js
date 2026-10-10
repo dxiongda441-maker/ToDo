@@ -355,7 +355,7 @@ function createUtsuroiEngine() {
     const DEFAULT_WEIGHTS = {
         tileStone: [4, 4, 12, 16],
         tileKing: [6, 6, 14, 18],
-        kingAdvance: 5,
+        kingAdvance: 10,
         kingThrone: 0,
         mobility: 3,
         threat: 6,
