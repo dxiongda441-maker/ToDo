@@ -103,6 +103,13 @@ async function checkTodo(browser, width) {
     check((await texts(page))[0] === "Buy oat milk", "期限日順に並べ替えられる");
     await page.selectOption("#sort-select", "added");
 
+    await page.fill("#task-input", "Plan trip #travel");
+    await page.press("#task-input", "Enter");
+    await page.click(".tag-filter");
+    check((await texts(page)).join() === "Plan trip #travel", "タグで絞り込める");
+    await page.click(".tag-filter.active");
+    await page.click(".task-item:has-text('Plan trip') .delete-button");
+
     await page.fill("#search-input", "oat");
     check((await texts(page)).join() === "Buy oat milk", "検索");
     await page.fill("#search-input", "");

@@ -13,6 +13,7 @@ TodoApp.tasks = (() => {
     const searchInput = document.querySelector("#search-input");
     const sortSelect = document.querySelector("#sort-select");
     const overdueCountEl = document.querySelector("#overdue-count");
+    const tagBar = document.querySelector("#tag-bar");
     const list = document.querySelector("#task-list");
     const template = document.querySelector("#task-template");
     const taskCountEl = document.querySelector("#task-count");
@@ -76,6 +77,89 @@ TodoApp.tasks = (() => {
         state.archivedTasks = [record, ...state.archivedTasks.filter(item => item.id !== record.id)];
     }
 
+    // ---------- タグ（本文中の #言葉） ----------
+    const TAG_PATTERN = /#([\p{L}\p{N}_-]+)/gu;
+
+    function tagsOf(text) {
+        const tags = new Set();
+        for (const match of text.matchAll(TAG_PATTERN)) {
+            tags.add(match[1].toLowerCase());
+        }
+        return tags;
+    }
+
+    // 検索欄が「#タグ」1 語だけなら、そのタグを持つタスクだけ（部分一致ではなく完全一致）
+    function tagQuery() {
+        const match = /^#([\p{L}\p{N}_-]+)$/u.exec(state.searchQuery.trim());
+        return match ? match[1].toLowerCase() : null;
+    }
+
+    function setSearch(value) {
+        state.searchQuery = value;
+        if (searchInput) {
+            searchInput.value = value;
+        }
+        renderTasks();
+    }
+
+    // 本文を、ふつうの文字とタグのボタンに分けて表示する（textContent だけを使う）
+    function renderTaskText(container, text) {
+        container.textContent = "";
+        let last = 0;
+        for (const match of text.matchAll(TAG_PATTERN)) {
+            if (match.index > last) {
+                container.appendChild(document.createTextNode(text.slice(last, match.index)));
+            }
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = "tag-chip";
+            chip.textContent = match[0];
+            chip.title = `Show tasks tagged ${match[0]}`;
+            chip.addEventListener("click", event => {
+                event.preventDefault();
+                event.stopPropagation();
+                setSearch(`#${match[1]}`);
+            });
+            container.appendChild(chip);
+            last = match.index + match[0].length;
+        }
+        if (last < text.length) {
+            container.appendChild(document.createTextNode(text.slice(last)));
+        }
+    }
+
+    function renderTagBar() {
+        if (!tagBar) {
+            return;
+        }
+        const counts = new Map();
+        state.tasks.forEach(task => {
+            tagsOf(task.text).forEach(tag => counts.set(tag, (counts.get(tag) || 0) + 1));
+        });
+        tagBar.hidden = counts.size === 0;
+        tagBar.textContent = "";
+        if (counts.size === 0) {
+            return;
+        }
+        const active = tagQuery();
+        const label = document.createElement("span");
+        label.className = "tag-bar-label";
+        label.textContent = "Tags:";
+        tagBar.appendChild(label);
+        Array.from(counts.entries())
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+            .forEach(([tag, count]) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "tag-filter";
+                button.classList.toggle("active", tag === active);
+                button.setAttribute("aria-pressed", tag === active ? "true" : "false");
+                button.textContent = `#${tag} ${count}`;
+                button.addEventListener("click", () => setSearch(tag === active ? "" : `#${tag}`));
+                tagBar.appendChild(button);
+            });
+    }
+
     // 期限日順：期限のあるものを日付の早い順に、期限のないものはその後ろに今の順番のまま並べる
     function sortTasks(list) {
         if (state.sortMode !== "due") {
@@ -99,6 +183,7 @@ TodoApp.tasks = (() => {
 
     function getFilteredTasks() {
         const query = state.searchQuery.trim().toLowerCase();
+        const tag = tagQuery();
 
         return sortTasks(state.tasks.filter(task => {
             if (state.activeFilter === "active" && task.completed) {
@@ -106,6 +191,9 @@ TodoApp.tasks = (() => {
             }
             if (state.activeFilter === "completed" && !task.completed) {
                 return false;
+            }
+            if (tag) {
+                return tagsOf(task.text).has(tag);
             }
             return !query || task.text.toLowerCase().includes(query);
         }));
@@ -261,7 +349,7 @@ TodoApp.tasks = (() => {
             }
 
             toggle.checked = Boolean(task.completed);
-            text.textContent = task.text;
+            renderTaskText(text, task.text);
 
             if (dueEl) {
                 const due = describeDueDate(task);
@@ -309,6 +397,7 @@ TodoApp.tasks = (() => {
 
         updateSummary();
         updateClearButtonState();
+        renderTagBar();
         TodoApp.history.refresh();
     }
 

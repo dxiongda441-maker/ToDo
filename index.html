@@ -16,7 +16,7 @@
         </header>
         <form id="todo-form" class="todo-form" autocomplete="off">
             <label class="visually-hidden" for="task-input">Task</label>
-            <input id="task-input" name="task" type="text" placeholder="Add a new task" required>
+            <input id="task-input" name="task" type="text" placeholder="Add a task (try #tags)" required>
             <label class="visually-hidden" for="due-input">Due date (optional)</label>
             <input id="due-input" name="due" type="date" title="Due date (optional)">
             <button type="submit">Add</button>
@@ -37,6 +37,8 @@
             </select>
             <button type="button" id="clear-completed" class="clear-button">Clear completed</button>
         </section>
+
+        <nav id="tag-bar" class="tag-bar" aria-label="Tags" hidden></nav>
 
         <section aria-label="Task list" class="task-section">
             <ul id="task-list" class="task-list" aria-live="polite"></ul>

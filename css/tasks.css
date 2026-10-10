@@ -125,6 +125,76 @@ body.dark .overdue-count {
     color: #fca5a5;
 }
 
+/* ---------- タグ ---------- */
+.tag-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin: -0.5rem 0 1.25rem;
+}
+
+.tag-bar[hidden] {
+    display: none;
+}
+
+.tag-bar-label {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+body.dark .tag-bar-label {
+    color: #cbd5f5;
+}
+
+.tag-filter,
+.tag-chip {
+    border: none;
+    border-radius: 999px;
+    font-family: inherit;
+    cursor: pointer;
+    background: rgba(124, 58, 237, 0.12);
+    color: #5b21b6;
+}
+
+.tag-filter {
+    padding: 0.25rem 0.65rem;
+    font-size: 0.8rem;
+}
+
+.tag-filter.active {
+    background: #6d28d9;
+    color: #fff;
+}
+
+.tag-chip {
+    padding: 0 0.4rem;
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+
+.tag-filter:hover,
+.tag-chip:hover,
+.tag-filter:focus-visible,
+.tag-chip:focus-visible {
+    background: rgba(124, 58, 237, 0.24);
+}
+
+.tag-filter.active:hover {
+    background: #5b21b6;
+}
+
+body.dark .tag-filter,
+body.dark .tag-chip {
+    background: rgba(167, 139, 250, 0.22);
+    color: #ddd6fe;
+}
+
+body.dark .tag-filter.active {
+    background: #8b5cf6;
+    color: #0f0a1f;
+}
+
 .clear-button {
     border: none;
     background: rgba(220, 38, 38, 0.08);
