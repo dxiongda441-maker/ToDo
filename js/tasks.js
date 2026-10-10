@@ -14,6 +14,7 @@ TodoApp.tasks = (() => {
     const searchInput = document.querySelector("#search-input");
     const sortSelect = document.querySelector("#sort-select");
     const overdueCountEl = document.querySelector("#overdue-count");
+    const weekCountEl = document.querySelector("#week-count");
     const tagBar = document.querySelector("#tag-bar");
     const list = document.querySelector("#task-list");
     const template = document.querySelector("#task-template");
@@ -141,6 +142,9 @@ TodoApp.tasks = (() => {
         };
         if (task.dueDate) {
             record.dueDate = task.dueDate;
+        }
+        if (task.completed && task.completedAt) {
+            record.completedAt = task.completedAt;
         }
 
         state.archivedTasks = [record, ...state.archivedTasks.filter(item => item.id !== record.id)];
@@ -492,6 +496,15 @@ TodoApp.tasks = (() => {
         taskCountEl.textContent = `${total} ${totalLabel}`;
         completedCountEl.textContent = `${completed} ${completedLabel}`;
 
+        // この 7 日間に 終えた 数（一覧から 片づけた ものも 数える）
+        if (weekCountEl) {
+            const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            const recent = item => item.completed && item.completedAt >= since;
+            const week = state.tasks.filter(recent).length + state.archivedTasks.filter(item => item.reason === "cleared" && recent(item)).length;
+            weekCountEl.hidden = week === 0;
+            weekCountEl.textContent = `${week} done this week`;
+        }
+
         if (overdueCountEl) {
             const todayKey = toDateKey(Date.now());
             const overdue = state.tasks.filter(task => !task.completed && task.dueDate && task.dueDate < todayKey).length;
@@ -519,7 +532,10 @@ TodoApp.tasks = (() => {
 
         task.completed = Boolean(completed);
         if (task.completed) {
+            task.completedAt = Date.now();
             spawnNext(task);
+        } else {
+            delete task.completedAt;
         }
         storage.saveTasks();
         renderTasks();

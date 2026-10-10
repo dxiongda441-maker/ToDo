@@ -145,6 +145,7 @@ async function checkTodo(browser, width) {
 
     await page.click("#clear-completed");
     check(!(await texts(page)).includes("Write report"), "Clear completed");
+    check((await page.textContent("#week-count")) === "1 done this week", "この 1 週間に 終えた 数が 出る（片づけた ものも 数える）");
     await page.click(".history-item:has-text('Write report') .history-restore");
     check((await texts(page)).includes("Write report"), "履歴から復元できる");
 

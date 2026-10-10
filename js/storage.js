@@ -66,6 +66,10 @@ TodoApp.storage = (() => {
         if (typeof item.nextId === "string" && item.nextId) {
             task.nextId = item.nextId;
         }
+        // 終えた日時（省略可能。これより前に 終えた タスクには 無い）
+        if (task.completed && isValidTimestamp(item.completedAt)) {
+            task.completedAt = item.completedAt;
+        }
 
         return { task, changed };
     }
@@ -93,6 +97,9 @@ TodoApp.storage = (() => {
         };
         if (task.dueDate) {
             record.dueDate = task.dueDate;
+        }
+        if (task.completedAt) {
+            record.completedAt = task.completedAt;
         }
 
         return { record, changed };

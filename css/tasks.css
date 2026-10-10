@@ -138,6 +138,15 @@ body.dark .overdue-count {
     color: #fca5a5;
 }
 
+.week-count {
+    font-weight: 600;
+    color: #047857;
+}
+
+body.dark .week-count {
+    color: #6ee7b7;
+}
+
 /* ---------- タグ ---------- */
 .tag-bar {
     display: flex;
