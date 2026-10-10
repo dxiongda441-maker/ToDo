@@ -8,6 +8,11 @@ TodoApp.storage = (() => {
     const state = TodoApp.state;
     const { generateId } = TodoApp.utils;
 
+    // 日時（ミリ秒）として使える数か。範囲外（例 1e100）だと Date が壊れて表示で例外になる
+    function isValidTimestamp(value) {
+        return typeof value === "number" && Number.isFinite(value) && !Number.isNaN(new Date(value).getTime());
+    }
+
     // 期限日は "YYYY-MM-DD" の文字列。無い・不正なら null（項目自体を保存しない）
     function normalizeDueDate(value) {
         return typeof value === "string" && DUE_DATE_PATTERN.test(value) ? value : null;
@@ -26,8 +31,8 @@ TodoApp.storage = (() => {
         }
 
         let changed = false;
-        const createdAt = typeof item.createdAt === "number" ? item.createdAt : now;
-        if (typeof item.createdAt !== "number") {
+        const createdAt = isValidTimestamp(item.createdAt) ? item.createdAt : now;
+        if (!isValidTimestamp(item.createdAt)) {
             changed = true;
         }
 
@@ -61,8 +66,8 @@ TodoApp.storage = (() => {
         }
 
         let changed = taskChanged;
-        const deletedAt = typeof item.deletedAt === "number" ? item.deletedAt : task.createdAt;
-        if (typeof item.deletedAt !== "number") {
+        const deletedAt = isValidTimestamp(item.deletedAt) ? item.deletedAt : task.createdAt;
+        if (!isValidTimestamp(item.deletedAt)) {
             changed = true;
         }
 

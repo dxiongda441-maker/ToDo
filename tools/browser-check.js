@@ -133,6 +133,36 @@ async function checkTodo(browser, width) {
     check(true, "書き出したバックアップを取り込める");
     fs.unlinkSync(backupPath);
 
+    // 履歴にある（削除した）タスクは、古いバックアップから復活させない。範囲外の日時でも壊れない
+    const trickyPath = path.join(os.tmpdir(), `todo-backup-tricky-${process.pid}.json`);
+    const archivedId = await page.evaluate(() => {
+        const id = "check-archived";
+        TodoApp.state.archivedTasks.unshift({ id, text: "Deleted on this device", createdAt: 1700000000000, deletedAt: 1700000500000, completed: false, reason: "deleted" });
+        TodoApp.storage.saveArchive();
+        return id;
+    });
+    fs.writeFileSync(trickyPath, JSON.stringify({
+        format: "todo-backup",
+        version: 1,
+        tasks: [
+            { id: archivedId, text: "Deleted on this device", completed: false, createdAt: 1700000000000 },
+            { id: "check-bad-date", text: "Bad date", completed: false, createdAt: 1e100 }
+        ],
+        archive: []
+    }));
+    await page.setInputFiles("#import-file", trickyPath);
+    await page.waitForFunction(() => Array.from(document.querySelectorAll(".task-text")).some(el => el.textContent === "Bad date"));
+    await page.reload();
+    const afterTricky = await texts(page);
+    check(!afterTricky.includes("Deleted on this device"), "削除したタスクは取り込みで復活しない");
+    check(afterTricky.includes("Bad date"), "範囲外の日時を取り込んでも表示が壊れない");
+    await page.evaluate(() => {
+        TodoApp.state.tasks = TodoApp.state.tasks.filter(task => task.id !== "check-bad-date");
+        TodoApp.storage.saveTasks();
+    });
+    await page.reload();
+    fs.unlinkSync(trickyPath);
+
     const monthBefore = await page.textContent("#month-label");
     await page.click("#prev-month");
     check((await page.textContent("#month-label")) !== monthBefore, "カレンダーの月を切り替えられる");

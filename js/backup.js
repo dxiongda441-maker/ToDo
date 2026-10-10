@@ -57,7 +57,8 @@ TodoApp.backup = (() => {
 
         incomingTasks.forEach(item => {
             const { task } = storage.normalizeTask(item, now);
-            if (task && !taskIds.has(task.id)) {
+            // 削除して履歴にあるタスクも「今のデータ」なので、古いバックアップで復活させない
+            if (task && !taskIds.has(task.id) && !archiveIds.has(task.id)) {
                 state.tasks.push(task);
                 taskIds.add(task.id);
                 addedTasks += 1;
