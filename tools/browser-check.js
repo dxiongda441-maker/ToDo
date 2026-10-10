@@ -257,8 +257,16 @@ async function checkHubAndRpg(browser, width) {
     await page.keyboard.press("Enter");
     await page.waitForSelector(".name-input");
     await page.keyboard.press("Enter");
-    await page.waitForFunction(() => HF.debug.game && HF.debug.game.map === "sora");
+    await page.waitForFunction(() => HF.debug.scene === "field" && localStorage.getItem("hoshifuru.save.v1"));
     check(true, "名前を決めて 冒険を始められる");
+    await page.evaluate(() => {
+        localStorage.setItem("hoshifuru.settings.v1", JSON.stringify({ sound: true }));
+    });
+    await page.reload();
+    await page.waitForFunction(() => window.HF && window.HF.debug && document.querySelector(".menu-item"));
+    await page.keyboard.press("Enter"); // つづきから（キーを押すと 音が 出せるようになる）
+    await page.waitForFunction(() => HF.audio.nowPlaying() === "town", null, { timeout: 5000 }).catch(() => {});
+    check(await page.evaluate(() => HF.audio.nowPlaying() === "town"), "音をオンにすると 村の曲が 鳴る");
     scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     check(scrollWidth <= width, `ほしふるクエストが 横にはみ出さない（${scrollWidth}px）`);
     check(errors.length === 0, `JavaScript のエラーなし ${errors.join(" / ")}`);

@@ -432,6 +432,10 @@
         enabled: false,
         tracks: parsed,
         parseMml,
+        // 今 鳴っている 曲の 名前（テスト用。鳴っていなければ null）
+        nowPlaying() {
+            return bgmPlayer && !bgmPlayer.stopped ? bgmPlayer.name : null;
+        },
         setEnabled(on) {
             this.enabled = Boolean(on);
             if (this.enabled) {
