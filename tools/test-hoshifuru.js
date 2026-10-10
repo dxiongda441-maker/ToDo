@@ -232,6 +232,25 @@ test("魔物と人の絵が すべてある", () => {
     Object.values(maps).forEach(map => (map.npcs || []).forEach(npc => assert.ok(sprites.PEOPLE.includes(npc.sprite), npc.sprite)));
 });
 
+test("とうぎじょう と まものはかせ：魔物・ほうびが 実在し、ランクは 順に ひらく", () => {
+    data.arena.forEach((rank, i) => {
+        assert.equal(rank.fights.length, 3, rank.name);
+        rank.fights.flat().forEach(id => assert.ok(data.enemies[id], `${rank.name} の ${id}`));
+        const prize = rank.prize.equip || rank.prize.item;
+        assert.ok(data.equipment[prize] || data.items[prize], `${rank.name} の ほうび ${prize}`);
+        assert.equal(rank.needs || null, i === 0 ? null : `arena${i}`);
+    });
+    let last = 0;
+    data.bookRewards.forEach(reward => {
+        const need = reward.count === "all" ? Object.keys(data.enemies).length : reward.count;
+        assert.ok(need > last && need <= Object.keys(data.enemies).length, reward.flag);
+        last = need;
+        reward.items.forEach(([id]) => assert.ok(data.items[id], id));
+    });
+    const people = Object.values(maps).flatMap(map => map.npcs || []);
+    assert.ok(people.some(npc => npc.arena) && people.some(npc => npc.scholar));
+});
+
 console.log("[ルール]");
 
 test("必要な経験値は レベルごとに増え、成長で能力が下がらない", () => {

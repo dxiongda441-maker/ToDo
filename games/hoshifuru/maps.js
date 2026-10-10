@@ -184,6 +184,8 @@
             place: "2",
             entry: { x: 13, y: 1 },
             npcs: [
+                { x: 24, y: 8, sprite: "soldier", arena: true },
+                { x: 4, y: 8, sprite: "elder", scholar: true },
                 { x: 4, y: 3, sprite: "merchant2", shop: "marine_arms" },
                 { x: 7, y: 3, sprite: "merchant2", shop: "marine_armor" },
                 { x: 21, y: 4, sprite: "nun", church: true },

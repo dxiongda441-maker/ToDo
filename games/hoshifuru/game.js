@@ -815,6 +815,14 @@
             await churchDialog();
             return;
         }
+        if (npc.arena) {
+            await arenaDialog();
+            return;
+        }
+        if (npc.scholar) {
+            await scholarDialog();
+            return;
+        }
         const entry = (npc.talk || []).find(t => (!t.if || game.flags[t.if]) && (!t.unless || !game.flags[t.unless]));
         if (!entry) {
             return;
@@ -1088,6 +1096,22 @@
 
         closeMessage();
         status.remove();
+        if (result === "lose" && options.arena) {
+            // とうぎじょうでは 負けても 全滅に ならない（お金も へらない）
+            await say(`${game.party[0].name}たちは たおれてしまった…`);
+            closeMessage();
+            await fade(() => {
+                scene = "field";
+                battleView = null;
+                game.party.forEach(member => {
+                    member.hp = Math.max(1, member.hp);
+                    member.poison = false;
+                });
+                audio.bgm(currentMap().music);
+            });
+            busy = false;
+            return "lose";
+        }
         if (result === "lose") {
             await wipeOut();
             busy = false;
@@ -1327,6 +1351,120 @@
         });
         saveGame();
         await say("おはようございます。 ゆうべは よく おやすみに なれましたか？\n（HP と MP が かいふくした。 冒険の書に きろくした）");
+    }
+
+    // とうぎじょう：3 回 つづけて 戦う
+    async function arenaDialog() {
+        await say("とうぎじょうへ ようこそ！ ここでは 3かい つづけて まものと たたかうのだ。\nとちゅうで やすむことは できないが、まけても いのちまでは とられないぞ。");
+        const ranks = data.arena;
+        // ふくろが いっぱいで わたせなかった ほうびを わたす
+        for (let i = 0; i < ranks.length; i += 1) {
+            if (game.flags[`arenaPending${i + 1}`] && await giveArenaPrize(ranks[i], i)) {
+                return;
+            }
+        }
+        const info = makeWin("info", { left: "3%", top: "3%", width: "40%", whiteSpace: "pre-wrap" });
+        const open = rank => (!rank.needs || game.flags[rank.needs]) && (!rank.needsAlso || game.flags[rank.needsAlso]);
+        const index = await choose(ranks.map((rank, i) => ({
+            label: open(rank) ? `${rank.name}ランク` : "？？？？",
+            value: i,
+            right: open(rank) ? `${rank.fee}G` : "",
+            disabled: !open(rank)
+        })).concat([{ label: "やめる", value: null }]), {
+            style: { right: "3%", top: "3%", minWidth: "50%" },
+            title: "どのランクに いどむ？",
+            onMove: item => {
+                const rank = ranks[item.value];
+                info.textContent = rank && open(rank)
+                    ? `めやす：Lv ${rank.lv}・${rank.party}人\n${game.flags[`arena${item.value + 1}`] ? "（クリアずみ）" : "はじめて 勝つと とくべつな ほうび"}`
+                    : "";
+            }
+        }).finally(() => info.remove());
+        if (index === null || index === undefined) {
+            await say("またの ちょうせんを まっているぞ！");
+            return;
+        }
+        const rank = ranks[index];
+        if (game.gold < rank.fee) {
+            await say(`さんかひは ${rank.fee}ゴールドだ。 おかねが たりないようだな。`);
+            return;
+        }
+        if (!(await yesNo(`${rank.name}ランクの さんかひは ${rank.fee}ゴールドだ。 いどむか？`))) {
+            await say("またの ちょうせんを まっているぞ！");
+            return;
+        }
+        game.gold -= rank.fee;
+        for (let round = 0; round < rank.fights.length; round += 1) {
+            await say(round === 0 ? "それでは はじめ！" : round === rank.fights.length - 1 ? "いよいよ さいごの あいてだ！" : "つぎの あいてだ！");
+            closeMessage();
+            const result = await startBattle(rank.fights[round], { boss: true, arena: true, music: round === rank.fights.length - 1 ? "boss" : "battle" });
+            busy = true;
+            if (result !== "win") {
+                await say("ざんねん！ また ちょうせん してくれ。\n（とうぎじょうの いしゃが てあてを してくれた）");
+                return;
+            }
+        }
+        const flag = `arena${index + 1}`;
+        if (!game.flags[flag]) {
+            game.flags[flag] = true;
+            note(`とうぎじょうの ${rank.name}ランクで ゆうしょうした！`);
+            await say(`おめでとう！ ${rank.name}ランク ゆうしょうだ！`);
+            game.flags[`arenaPending${index + 1}`] = true;
+            await giveArenaPrize(rank, index);
+        } else {
+            game.gold += rank.gold;
+            await say(`おめでとう！ ${rank.name}ランク ゆうしょうだ！\nしょうきんの ${rank.gold}ゴールドを うけとれ！`);
+        }
+        saveGame();
+    }
+
+    async function giveArenaPrize(rank, index) {
+        const prize = rank.prize;
+        const id = prize.equip || prize.item;
+        const name = (data.equipment[id] || data.items[id]).name;
+        if (!R.addItem(game.bag, id)) {
+            await say(`ほうびの ${name}を わたしたいが、ふくろが いっぱいのようだ。\nあけてから また 話しかけてくれ。`);
+            return true;
+        }
+        delete game.flags[`arenaPending${index + 1}`];
+        audio.jingle("item");
+        await say(`${rank.name}ランクの ほうびに ${name}を さずけよう！`);
+        saveGame();
+        return true;
+    }
+
+    // まものはかせ：ずかんの 数に おうじて ほうび
+    async function scholarDialog() {
+        const total = Object.keys(data.enemies).length;
+        const seen = Object.keys(game.seen).length;
+        await say(`わしは まものはかせ。 せかいじゅうの まものを しらべておる。\nおぬしの ずかんには ${seen}しゅるいの まものが のっておるな。`);
+        let gave = false;
+        for (const reward of data.bookRewards) {
+            const need = reward.count === "all" ? total : reward.count;
+            if (game.flags[reward.flag] || seen < need) {
+                continue;
+            }
+            // ふくろに 入りきらないときは わたさない（あとで もういちど 話せば もらえる）
+            const before = JSON.stringify(game.bag);
+            if (!reward.items.every(([id, count]) => R.addItem(game.bag, id, count))) {
+                game.bag = JSON.parse(before);
+                await say("おや、ふくろが いっぱいじゃな。 あけてから また くるのじゃ。");
+                break;
+            }
+            game.flags[reward.flag] = true;
+            gave = true;
+            const names = reward.items.map(([id, count]) => (count > 1 ? `${data.items[id].name}を ${count}こ` : `${data.items[id].name}を`));
+            audio.jingle("item");
+            await say(`${need === total ? "なんと ぜんぶの" : `${need}しゅるいの`} まものを しらべたか！ おれいに ${names.join("、")} あげよう。`);
+        }
+        const next = data.bookRewards.find(reward => !game.flags[reward.flag]);
+        if (next) {
+            const need = next.count === "all" ? total : next.count;
+            await say(`${need}しゅるい しらべたら また くるのじゃ。 ${gave ? "" : "まだ "}たのしみに しておるぞ。`);
+        } else if (!gave) {
+            await say("ぜんぶの まものを しらべるとは… おぬしこそ まことの まものはかせじゃ！");
+        }
+        saveGame();
     }
 
     async function churchDialog() {

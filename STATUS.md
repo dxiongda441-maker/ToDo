@@ -8,7 +8,8 @@
 
 - **`master` には最初のコミットしかない。** `index.html` / `app.js` / `styles.css` の 3 ファイル構成のまま。
 - 下の作業はすべてブランチ上にある。最新は `claude/dreamy-albattani-0f40sg`（ほかのブランチの作業もすべて含む）。
-- 最新の状態で `bash tools/check.sh` と `node tools/browser-check.js`（375px・1024px）は「すべて OK」。
+- 最新の状態で `bash tools/check.sh` と `node tools/browser-check.js`（375px・1024px・axe あり）は「すべて OK」。
+- RPG の通しテスト `node tools/hoshifuru-playtest.js`（Playwright・20〜30 分）も最後まで通ることを確かめている。
 
 ## ブランチごとの作業
 
@@ -17,7 +18,7 @@
 | `claude/organize-file-directory-yq7io2` | ファイルを `css/`・`js/` に分割。`CLAUDE.md`・`README.md`・`tools/check.sh`・CI・`.editorconfig`・PR ひな形を追加 | 完了 |
 | `claude/sharp-bardeen-ydptez` | 上のブランチ ＋ スマホ幅でタスク一覧がはみ出す不具合の修正 | 完了 |
 | `claude/laughing-ptolemy-qju2td` | 上のブランチ ＋ `STATUS.md` と「`STATUS.md` を読む・更新する」ルール | PR #1 で `master` へのマージ待ち |
-| `claude/dreamy-albattani-0f40sg` | 上のブランチ ＋ ToDo の機能追加 ＋ ゲーム「うつろい」 | PR #2 で `master` へのマージ待ち |
+| `claude/dreamy-albattani-0f40sg` | 上のブランチ ＋ ToDo の機能追加 ＋ ゲーム「うつろい」＋ RPG「ほしふるクエスト」＋ 集中タイマー・ゲーム一覧 | PR #2 で `master` へのマージ待ち |
 
 各ブランチは前のブランチの上に積み重なっている（`organize` ⊂ `sharp-bardeen` ⊂ `laughing-ptolemy` ⊂ `dreamy-albattani`）。
 
@@ -40,11 +41,21 @@
 - `tools/browser-check.js`（ブラウザでの確認）、`tools/test-utsuroi.js`（ゲームのテスト、`check.sh` から実行）、
   `tools/utsuroi-selfplay.js`（ルールの釣り合いの確認）、`tools/utsuroi-make-puzzles.js`（詰め問題の生成）を追加。
 
+- RPG「ほしふるクエスト」（`games/hoshifuru/`）：ドット絵の昔ながらの RPG。3 つの町・5 つのダンジョン・仲間 2 人・
+  じゅもん 17・魔物 32・ボス 6。曲と効果音は Web Audio でその場で作る（MML）。成長を感じる仕組み
+  （弱い魔物がにげる・ぼうけん日誌・まもの ずかん）、クリア後の星の遺跡とほしくい、とうぎじょう（4 ランク）、まものはかせ。
+  ToDo で終えたタスクが「がんばりのたね」になる。テスト `tools/test-hoshifuru.js`、難しさの自動プレイ `tools/hoshifuru-balance.js`、
+  ブラウザでの通しテスト `tools/hoshifuru-playtest.js`。
+- ToDo：集中タイマー（ポモドーロ。保存は `todo.focus.v1`、タスクの保存形式は変えていない）。
+- ゲーム一覧 `games/index.html`（それぞれの進み具合と、たねになるのを待っているタスクの数を表示）。
+
 ## 次にやること
 
 1. PR #2（`claude/dreamy-albattani-0f40sg` → `master`）を確認してマージする。PR #1 の内容も含むので、これだけで全部入る
    （PR #1 は、PR #2 をマージしたら閉じてよい）。途中で消したスクリーンショットが履歴に残らないよう、Squash and merge がおすすめ。
 2. ゲームを実際に何局か遊んで、難しさ（特に「やさしい」）や説明のわかりやすさについての感想を集める。
+3. ほしふるクエストを人が通して遊び、難しさ（特に ほらあなの いわおとこ・湖の神殿）と 迷いやすさの感想を集める。
+   数字は `games/hoshifuru/data.js`、確かめ方は `games/hoshifuru/README.md`。
 
 ## 更新のしかた
 

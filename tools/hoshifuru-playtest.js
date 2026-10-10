@@ -256,6 +256,7 @@ function check(condition, label) {
     await page.evaluate(() => {
         HF.debug.setAutoBattle(true);
         HF.debug.setLevel(9);
+        HF.debug.game.party[0].equip = { weapon: "dounotsurugi", armor: "kawanoyoroi", shield: "kawanotate" };
     });
     await leaveTown(11, 17, "down");
     check((await state()).map === "world", "村の外へ出られる");
@@ -299,7 +300,27 @@ function check(condition, label) {
     check(g.size === 2 && g.name === "ルナ", "ルナが 仲間になる");
 
     console.log("[風の塔 → 森の村 → 湖の神殿]");
+    // その段階で 買える そうびを つけておく（テストしたいのは 道と できごと。ボスは 確実に たおしたい）
+    const gear = list => page.evaluate(items => HF.debug.game.party.forEach((m, i) => {
+        m.equip = Object.assign({}, items[i]);
+    }), list);
     await page.evaluate(() => HF.debug.setLevel(16));
+    await gear([{ weapon: "tetsunoyari", armor: "kusarikatabira", shield: "tetsunotate" }, { weapon: "madoushinotsue", armor: "mahounorobu" }]);
+
+    console.log("[とうぎじょう・まものはかせ]");
+    await page.evaluate(() => {
+        HF.debug.game.gold += 100;
+    });
+    await walkTo(24, 8, true); // とうぎじょうの 受付
+    await talk();
+    await select("ブロンズ");
+    await select("はい");
+    await settle(4000);
+    check(await game("g => Boolean(g.flags.arena1) && g.bag.some(e => e.id === 'tetsunotate')"), "とうぎじょうの ブロンズランクで 3 連勝して ほうびを もらう");
+    await walkTo(4, 8, true); // まものはかせ
+    await talk();
+    await settle();
+    check(await game("g => Boolean(g.flags.book1) === (Object.keys(g.seen).length >= 8)"), "まものはかせが ずかんの 数に おうじて ほうびを くれる");
     await leaveTown(13, 0, "up");
     await enterPlace("w");
     for (const [x, y] of [[19, 3], [19, 1], [7, 3]]) {
@@ -319,6 +340,7 @@ function check(condition, label) {
     await settle();
     check(await game("g => g.party.length === 3"), "ミントが 仲間になる");
     await page.evaluate(() => HF.debug.setLevel(21));
+    await gear([{ weapon: "haganenotsurugi", armor: "haganenoyoroi", shield: "tetsunotate" }, { weapon: "seinarutsue", armor: "seinarurobu" }, { weapon: "tetsunomeisu", armor: "kusarikatabira", shield: "tetsunotate" }]);
     await leaveTown(11, 17, "down");
     await enterPlace("s");
     for (const [x, y] of [[15, 3], [8, 3]]) {
@@ -332,6 +354,7 @@ function check(condition, label) {
 
     console.log("[かげの城 → エンディング]");
     await page.evaluate(() => HF.debug.setLevel(27));
+    await gear([{ weapon: "hoshinotsurugi", armor: "hikarinoyoroi", shield: "hoshinotate" }, { weapon: "seinarutsue", armor: "seinarurobu" }, { weapon: "seinarutsue", armor: "seinarurobu", shield: "tetsunotate" }]);
     await page.evaluate(() => HF.debug.warp("world", 37, 10));
     await settle();
     await enterPlace("k");

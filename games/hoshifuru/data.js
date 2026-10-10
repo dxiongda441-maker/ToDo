@@ -98,7 +98,8 @@
 
         kawanotate: { name: "かわのたて", slot: "shield", def: 4, price: 90, classes: ["hero", "priest"] },
         tetsunotate: { name: "てつのたて", slot: "shield", def: 10, price: 650, classes: ["hero", "priest"] },
-        hoshinotate: { name: "ほしのたて", slot: "shield", def: 20, price: 2400, classes: ["hero"] }
+        hoshinotate: { name: "ほしのたて", slot: "shield", def: 20, price: 2400, classes: ["hero"] },
+        yuushanotate: { name: "ゆうしゃのたて", slot: "shield", def: 30, price: 0, classes: ["hero"] }
     };
 
     // ---------- モンスター ----------
@@ -140,10 +141,10 @@
         yaminomonban: { name: "やみのもんばん", sprite: "golem", palette: "dark", hp: 1700, atk: 94, def: 54, agi: 20, exp: 1200, gold: 900, boss: true, sleepImmune: true, actionsPerTurn: 2, actions: [["attack", 3], ["charge", 2], ["quake", 2]] },
         kagenoou: { name: "かげの王", sprite: "king", palette: "shadow", hp: 1700, atk: 92, def: 60, agi: 42, exp: 0, gold: 0, boss: true, sleepImmune: true, actionsPerTurn: 2, resist: { light: 1.5 }, actions: [["attack", 3], ["darkFlame", 2], ["dispel", 1]] },
         // クリア後の 星の遺跡
-        hoshipururin: { name: "ほしぷるりん", sprite: "blob", palette: "star", hp: 150, atk: 98, def: 66, agi: 40, exp: 140, gold: 70, actions: [["attack", 3], ["spell:honoo", 1], ["healAlly", 1]] },
-        nagareboshibat: { name: "ながれぼしバット", sprite: "bat", palette: "cosmic", hp: 130, atk: 102, def: 56, agi: 64, exp: 150, gold: 80, actions: [["attack", 3], ["windBlade", 1]] },
-        meteogolem: { name: "メテオゴーレム", sprite: "golem", palette: "cosmic", hp: 260, atk: 112, def: 80, agi: 18, exp: 220, gold: 110, sleepImmune: true, actions: [["attack", 3], ["quake", 1]] },
-        ginganokishi: { name: "ぎんがのきし", sprite: "knight", palette: "star", hp: 210, atk: 118, def: 82, agi: 34, exp: 200, gold: 100, resist: { thunder: 0.7 }, actions: [["attack", 3], ["charge", 1]] },
+        hoshipururin: { name: "ほしぷるりん", sprite: "blob", palette: "star", hp: 170, atk: 132, def: 66, agi: 40, exp: 140, gold: 70, actions: [["attack", 3], ["spell:honoo", 1], ["healAlly", 1]] },
+        nagareboshibat: { name: "ながれぼしバット", sprite: "bat", palette: "cosmic", hp: 150, atk: 136, def: 56, agi: 64, exp: 150, gold: 80, actions: [["attack", 3], ["windBlade", 1]] },
+        meteogolem: { name: "メテオゴーレム", sprite: "golem", palette: "cosmic", hp: 300, atk: 150, def: 80, agi: 18, exp: 220, gold: 110, sleepImmune: true, actions: [["attack", 3], ["quake", 1]] },
+        ginganokishi: { name: "ぎんがのきし", sprite: "knight", palette: "star", hp: 240, atk: 156, def: 82, agi: 34, exp: 200, gold: 100, resist: { thunder: 0.7 }, actions: [["attack", 3], ["charge", 1]] },
         hoshikui: { name: "ほしくい", sprite: "snake", palette: "cosmic", hp: 3000, atk: 116, def: 76, agi: 55, exp: 6000, gold: 3000, boss: true, sleepImmune: true, actionsPerTurn: 2, resist: { light: 0.5 }, actions: [["attack", 3], ["starFall", 2], ["dispel", 1], ["selfHeal", 1]] },
 
         kagenoou2: { name: "かげの王（しんのすがた）", sprite: "king", palette: "true", hp: 2100, atk: 100, def: 64, agi: 48, exp: 0, gold: 0, boss: true, sleepImmune: true, actionsPerTurn: 2, resist: { light: 1.5 }, actions: [["attack", 3], ["darkFlame", 2], ["dispel", 1], ["selfHeal", 1]] }
@@ -182,7 +183,29 @@
         ruins: { enemies: ["hoshipururin", "nagareboshibat", "meteogolem", "ginganokishi"], max: 4, rare: "pikarin" }
     };
 
-    const data = { classes, spells, items, equipment, enemies, skills, zones };
+    // ---------- とうぎじょう（港町マリン） ----------
+    // 3 回 つづけて 戦う（あいだに 回復しない）。lv と party は めやす（その人数・その段階の そうびで、自動プレイが 9 割ほど 勝てる レベル。tools/hoshifuru-balance.js では 調べていない）
+    // prize は はじめて 勝ったときの ほうび、gold は 2 回目からの 賞金。needs の フラグが ないと 挑めない
+    const arena = [
+        { name: "ブロンズ", party: 2, fee: 30, lv: 7, prize: { equip: "tetsunotate" }, gold: 100,
+            fights: [["purubesu", "purubesu", "dokugumo"], ["honezou", "honezou", "hinokobat"], ["umipururin", "tsumujidori", "tsumujidori"]] },
+        { name: "シルバー", party: 2, fee: 100, lv: 10, needs: "arena1", prize: { equip: "haganenotsurugi" }, gold: 300,
+            fights: [["gaikotsukenshi", "gaikotsukenshi", "gaikotsukenshi", "madoukinoko"], ["samayouyoroi", "tsumujidori", "tsumujidori"], ["iwaotoko", "iwaotoko"]] },
+        { name: "ゴールド", party: 3, fee: 300, lv: 14, needs: "arena2", prize: { equip: "hikarinotsurugi" }, gold: 800,
+            fights: [["samayouyoroi", "samayouyoroi", "samayouyoroi", "yureilamp"], ["yaminokishi", "morinokemono", "morinokemono"], ["arashinooodori", "mizuhebi", "mizuhebi"]] },
+        { name: "ほし", party: 3, fee: 1000, lv: 26, needs: "arena3", needsAlso: "cleared", prize: { equip: "yuushanotate" }, gold: 2500,
+            fights: [["ginganokishi", "ginganokishi", "hoshipururin", "hoshipururin"], ["meteogolem", "meteogolem", "nagareboshibat", "nagareboshibat"], ["kagenoou2", "ginganokishi", "ginganokishi"]] }
+    ];
+
+    // まものはかせ（港町マリン）：ずかんに のった 数に おうじて ほうびを くれる
+    const bookRewards = [
+        { count: 8, flag: "book1", items: [["mahounomizu", 2]] },
+        { count: 16, flag: "book2", items: [["fukkatsunohane", 1], ["ganbarinotane", 1]] },
+        { count: 24, flag: "book3", items: [["ganbarinotane", 3]] },
+        { count: "all", flag: "book4", items: [["ganbarinotane", 5]] }
+    ];
+
+    const data = { classes, spells, items, equipment, enemies, skills, zones, arena, bookRewards };
 
     const HF = root.HF = root.HF || {};
     HF.data = data;
