@@ -767,7 +767,10 @@
 
     // ---------- おまかせ（自動で命令を決める） ----------
     // 体力が減った味方がいれば回復、敵が多ければ全体じゅもん、そうでなければ弱った敵をねらう
-    function autoCommands(battle, bag) {
+    // tactic（さくせん）：normal バッチリがんばれ / attack ガンガンいこうぜ / safe いのちだいじに / save じゅもんせつやく
+    const TACTICS = ["normal", "attack", "safe", "save"];
+
+    function autoCommands(battle, bag, tactic = "normal") {
         const commands = [];
         const enemiesAlive = battle.enemies.map((e, i) => i).filter(i => !battle.enemies[i].gone && battle.enemies[i].hp > 0);
         const weakest = enemiesAlive.reduce((best, i) => (best === -1 || battle.enemies[i].hp < battle.enemies[best].hp ? i : best), -1);
@@ -778,7 +781,7 @@
                 return;
             }
             const has = spellId => member.spells.includes(spellId) && member.mp >= data.spells[spellId].mp;
-            const threshold = isBoss ? 0.55 : 0.4;
+            const threshold = { normal: isBoss ? 0.55 : 0.4, attack: isBoss ? 0.4 : 0.25, safe: isBoss ? 0.7 : 0.6, save: isBoss ? 0.55 : 0.4 }[tactic] || 0.4;
             const hurt = battle.party.map((m, i) => i).filter(i => battle.party[i].hp > 0 && battle.party[i].hp < maxHp(battle.party[i]) * threshold);
             const down = battle.party.map((m, i) => i).filter(i => battle.party[i].hp <= 0);
             if (down.length > 0 && has("yomigaeri")) {
@@ -801,7 +804,8 @@
                     return;
                 }
                 const potion = ["jouyakusou", "yakusou"].find(id => itemCount(bag, id) > 0);
-                if (potion && target === index) {
+                // いのちだいじに では 仲間にも やくそうを つかう
+                if (potion && (target === index || tactic === "safe")) {
                     commands.push({ type: "item", item: potion, target });
                     return;
                 }
@@ -810,8 +814,14 @@
                 commands.push({ type: "spell", spell: "mamori" });
                 return;
             }
+            // じゅもんせつやく：回復いがいの じゅもんは つかわない
+            if (tactic === "save") {
+                commands.push({ type: "attack", target: weakest });
+                return;
+            }
             const group = ["bakuhatsu", "ikazuchi", "honoo", "koori"].find(has);
-            const mpRatio = member.mp / Math.max(1, maxMp(member));
+            // ガンガンいこうぜ では MP が 少なくても 攻撃じゅもんを つかう
+            const mpRatio = tactic === "attack" ? 1 : member.mp / Math.max(1, maxMp(member));
             if (group && enemiesAlive.length >= 2 && (mpRatio > 0.35 || isBoss)) {
                 commands.push({ type: "spell", spell: group });
                 return;
@@ -865,6 +875,7 @@
         revive,
         rollEncounter,
         overwhelms,
+        TACTICS,
         createBattle,
         resolveRound,
         battleRewards,

@@ -1260,7 +1260,16 @@
                 return { flee: true };
             }
             if (choice === "auto") {
-                const auto = R.autoCommands(battle, game.bag);
+                const tactic = await choose(TACTIC_ITEMS, {
+                    style: { left: "3%", bottom: "3%", minWidth: "50%" },
+                    title: "さくせん",
+                    start: Math.max(0, R.TACTICS.indexOf(game.tactic || "normal"))
+                });
+                if (tactic === null) {
+                    continue;
+                }
+                game.tactic = tactic;
+                const auto = R.autoCommands(battle, game.bag, tactic);
                 return game.party.map((m, idx) => commands[idx] || auto[idx] || { type: "attack", target: 0 });
             }
             if (choice === "attack") {
@@ -1322,6 +1331,13 @@
 
     // じゅもんの 光の色（属性ごと）
     const SPELL_COLORS = { fire: "#ff8a3d", ice: "#7fdcff", thunder: "#ffe94d", light: "#fff2b3", blast: "#ff5a5a" };
+
+    const TACTIC_ITEMS = [
+        { label: "バッチリがんばれ", value: "normal" },
+        { label: "ガンガンいこうぜ", value: "attack" },
+        { label: "いのちだいじに", value: "safe" },
+        { label: "じゅもんせつやく", value: "save" }
+    ];
 
     async function playEvents(events, shown, status) {
         for (const event of events) {

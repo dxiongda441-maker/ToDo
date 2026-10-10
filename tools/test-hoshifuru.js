@@ -374,6 +374,16 @@ test("むずかしさ「かんたん」では 経験値と お金が 1.5 倍", (
     assert.equal(easy.gold, Math.round(normal.gold * 1.5));
 });
 
+test("さくせん：じゅもんせつやく では 攻撃じゅもんを つかわない・ガンガンいこうぜ では つかう", () => {
+    const rng = seededRng(4);
+    const mage = R.createMember("mage", "ルナ", 20, rng);
+    mage.mp = 30; // 3 わり ほど（ふつうなら せつやくする）
+    const battle = R.createBattle([mage], ["morinokemono", "mizuhebi"]);
+    const spellOf = tactic => R.autoCommands(battle, R.createBag(), tactic)[0];
+    assert.equal(spellOf("save").type, "attack");
+    assert.equal(spellOf("attack").type, "spell");
+});
+
 console.log("[音]");
 
 test("MML：音の高さと長さ", () => {
