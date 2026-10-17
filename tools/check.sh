@@ -63,5 +63,21 @@ else
   ng "RPG のテストが失敗した（node tools/test-hoshifuru.js で詳細）"
 fi
 
+echo "[三界戦棋（games/sankai）のファイルと文法]"
+for f in $(grep -o '\(href\|src\)="[^"#:]*\.\(css\|js\)"' games/sankai/index.html | sed 's/.*="\(.*\)"/\1/'); do
+  [ -f "games/sankai/$f" ] && ok "games/sankai/$f" || ng "games/sankai/$f が無い"
+done
+for f in games/sankai/*.js; do
+  node --check "$f" 2>/dev/null && ok "$f" || ng "$f に文法エラーがある"
+done
+
+echo "[三界戦棋の ルールと CPU の テスト]"
+if sankai_output=$(node tools/test-sankai.js 2>&1); then
+  ok "node tools/test-sankai.js"
+else
+  echo "$sankai_output"
+  ng "三界戦棋の テストが 失敗した（node tools/test-sankai.js で 詳細）"
+fi
+
 echo
 if [ "$FAIL" -eq 0 ]; then echo "すべて OK"; else echo "NG があります"; exit 1; fi

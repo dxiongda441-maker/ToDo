@@ -296,7 +296,7 @@ async function checkHubAndRpg(browser, width) {
         localStorage.setItem("todo.focus.v1", JSON.stringify({ days: { "2026-01-02": { sessions: 2, minutes: 50 } } }));
     });
     await page.reload();
-    check((await page.$$(".card .play")).length === 2, "ゲーム一覧に 2 つのゲームがある");
+    check((await page.$$(".card .play")).length === 3, "ゲーム一覧に 3 つのゲームがある");
     check((await page.textContent("#utsuroi-progress")).includes("2 勝 1 敗"), "うつろいの戦績が出る");
     check((await page.textContent("#seeds")).includes("3 件"), "がんばりのたねに なる 数（終えたタスク ＋ 集中した回数）が出る");
     let scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
@@ -325,6 +325,38 @@ async function checkHubAndRpg(browser, width) {
     await page.close();
 }
 
+async function checkSankai(browser, width) {
+    console.log(`[三界戦棋・幅 ${width}px]`);
+    const { page, errors } = await newPage(browser, { width, height: 900 });
+    await page.goto(`file://${path.join(root, "games", "sankai", "index.html")}`);
+    await page.evaluate(() => {
+        localStorage.clear();
+        localStorage.setItem("sankai.game.v1", JSON.stringify({ mode: "cpu", level: "easy", human: 1, moves: [] }));
+    });
+    await page.reload();
+    await page.waitForTimeout(600);
+    // 地上の 歩兵（5 筋）を えらんで 1 マス 前へ
+    const clickSq = async sq => {
+        const [x, y] = await page.evaluate(s => window.SankaiDebug.scene.screenOf(s), sq);
+        const box = await page.locator("#scene").boundingBox();
+        await page.mouse.click(box.x + x, box.y + y);
+        await page.waitForTimeout(150);
+    };
+    await clickSq(81 + 6 * 9 + 4);
+    check((await page.textContent("#info-name")).startsWith("歩兵"), "駒を えらぶと 説明が 出る");
+    await clickSq(81 + 5 * 9 + 4);
+    await page.waitForFunction(() => window.SankaiDebug.game.moves.length >= 2 && !window.SankaiDebug.busy, null, { timeout: 15000 });
+    check(true, "駒を 動かすと CPU が 指し返す");
+    check((await page.$$("#log-list li")).length === 2, "棋譜に 残る");
+    await page.click("#undo-button");
+    check(await page.evaluate(() => window.SankaiDebug.game.moves.length === 0), "待ったで 戻せる");
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    check(scrollWidth <= width, `横にはみ出さない（${scrollWidth}px）`);
+    await checkAccessibility(page, "三界戦棋");
+    check(errors.length === 0, `JavaScript のエラーなし ${errors.join(" / ")}`);
+    await page.close();
+}
+
 (async () => {
     if (!axePath) {
         console.log("（axe-core が見つからないため、アクセシビリティの自動チェックは飛ばします）");
@@ -335,6 +367,7 @@ async function checkHubAndRpg(browser, width) {
             await checkTodo(browser, width);
             await checkGame(browser, width);
             await checkHubAndRpg(browser, width);
+            await checkSankai(browser, width);
         }
     } finally {
         await browser.close();

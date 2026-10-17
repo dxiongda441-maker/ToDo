@@ -45,6 +45,15 @@
 - ToDo の保存データは **読むだけ**（がんばりのたね）。書きかえない。
 - 大きく変えたら `node tools/hoshifuru-playtest.js`（Playwright・20〜30 分）で最初から最後まで通るか確かめる。
 
+## 三界戦棋（games/sankai）
+
+- 画面の文言は日本語。説明は `games/sankai/README.md`。
+- `engine.js` はルールと CPU だけ。CPU は `createSankaiEngine` 関数を文字列にして Web Worker で動かすので、
+  **この関数の外の変数を参照しない**（`tools/test-sankai.js` で確かめている）。
+- ルールを変えたら `tools/test-sankai.js` を直し、`node tools/sankai-selfplay.js 20 normal` で先手・後手の勝率や勝ち方が
+  極端になっていないか確かめる。
+- 絵は `art.js`（駒）と `scene.js`（戦場・演出）。3D のライブラリは使わず、canvas 2D で遠近法を計算している。
+
 ## 作業の進め方
 
 - **作業の始めに `STATUS.md` を読み、終わりに更新する。** 別のセッションと作業状況を共有するため。

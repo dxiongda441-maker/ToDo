@@ -24,6 +24,8 @@
 
 - **うつろい**（`games/utsuroi/`）：駒の動きを床の紋が決め、駒が離れるたびに床が変わる、オリジナルの 2 人用盤上ゲーム。
   説明は [`games/utsuroi/README.md`](games/utsuroi/README.md)。
+- **三界戦棋**（`games/sankai/`）：空・地上・地下の 3 段で 戦う、立体の 戦争将棋。戦場を ななめ上から 見た 絵で、砲撃・爆撃などの 演出つき。
+  説明は [`games/sankai/README.md`](games/sankai/README.md)。
 - **ほしふるクエスト**（`games/hoshifuru/`）：レベルを上げて強くなる、ドット絵のロールプレイングゲーム。
   ToDo で終えたタスクと集中タイマーの集中が、ゲームの中で能力を上げる「がんばりのたね」になる（受け取れる数は ToDo 画面の一番下にも出る）。説明は [`games/hoshifuru/README.md`](games/hoshifuru/README.md)。
 
@@ -53,11 +55,14 @@ ToDo/
 │   ├── utsuroi-make-puzzles.js  ゲームの詰め問題を作る
 │   ├── test-hoshifuru.js    RPG のマップ・データ・ルール・曲のテスト
 │   ├── hoshifuru-balance.js RPG の難しさを 自動プレイで調べる
-│   └── hoshifuru-playtest.js RPG を ブラウザで 最初から最後まで 通して遊ぶ（Playwright がある環境だけ）
+│   ├── hoshifuru-playtest.js RPG を ブラウザで 最初から最後まで 通して遊ぶ（Playwright がある環境だけ）
+│   ├── test-sankai.js       三界戦棋の ルールと CPU の テスト
+│   └── sankai-selfplay.js   三界戦棋の CPU どうしの 対局で 釣り合いを 調べる
 ├── games/
 │   ├── index.html    ゲーム一覧（進み具合も表示）
 │   ├── utsuroi/      盤上戦略ゲーム「うつろい」（README.md に詳しい説明）
-│   └── hoshifuru/    RPG「ほしふるクエスト」（README.md に詳しい説明）
+│   ├── hoshifuru/    RPG「ほしふるクエスト」（README.md に詳しい説明）
+│   └── sankai/       立体の 戦争将棋「三界戦棋」（README.md に詳しい説明）
 ├── .github/          自動チェックとプルリクエストのひな形
 ├── css/
 │   ├── base.css      色変数・背景・全体レイアウト・共通クラス
