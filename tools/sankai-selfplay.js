@@ -21,6 +21,7 @@ const reasons = {};
 const captured = {};
 const shots = {};
 let plies = 0;
+let skyMoves = 0; // 空で 動いた 手（多すぎると 地上の 戦いが 進まない）
 for (let g = 0; g < games; g += 1) {
     let s = E.initialState();
     // 序盤を 少し ばらけさせる（同じ 対局ばかりに ならないように）
@@ -31,6 +32,9 @@ for (let g = 0; g < games; g += 1) {
     while (!s.result) {
         const move = E.chooseMove(s, level, rng);
         const target = s.board[move.to];
+        if (move.kind === "move" && E.layerOf(move.from) === E.SKY) {
+            skyMoves += 1;
+        }
         if (move.kind !== "drop" && target && E.sideOf(target) !== s.turn) {
             const name = E.pieceInfo(target).name;
             captured[name] = (captured[name] || 0) + 1;
@@ -50,5 +54,6 @@ console.log();
 console.log(`先手 ${wins[E.SENTE]} 勝・後手 ${wins[E.GOTE]} 勝・引き分け ${wins[0]}`);
 console.log("勝ち方:", reasons);
 console.log("平均手数:", (plies / games).toFixed(1));
+console.log("空を 飛んだ 手の 割合:", `${Math.round((skyMoves / plies) * 100)}%`);
 console.log("取られた駒:", captured);
 console.log("撃って取った（砲兵・対空砲・爆撃機）:", shots);

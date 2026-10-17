@@ -43,7 +43,7 @@ function createSankaiEngine() {
         [AA]: { key: "aa", name: "対空砲", short: "対", layers: [GROUND], text: "縦横に 1 マス。または 動かずに 上空 3×3 の 敵機を 撃ち落とす" },
         [ENG]: { key: "eng", name: "工兵", short: "工", layers: [GROUND, UNDER], text: "周り 1 マス。同じ マスで 地上と 地下を 行き来できる。地下から 真上の 敵を 襲って 地上に 出られる" },
         [FTR]: { key: "ftr", name: "戦闘機", short: "闘", layers: [SKY], text: "空を 8 方向に 3 マスまで。空の 敵機を 取る" },
-        [BMB]: { key: "bmb", name: "爆撃機", short: "爆", layers: [SKY], text: "空を 8 方向に 2 マスまで（取れない）。または 動かずに 真下の 地上の 敵を 爆撃する" }
+        [BMB]: { key: "bmb", name: "爆撃機", short: "爆", layers: [SKY], text: "空を 周り 1 マス（重くて 遅い・取れない）。または 動かずに 真下の 地上の 敵を 爆撃する（司令官は 地下壕に いるので 爆撃できない）" }
     };
 
     // 駒の 価値（CPU の 評価と、取った駒の 見せ方に 使う）
@@ -52,7 +52,7 @@ function createSankaiEngine() {
         [TNK]: 800, [TNK + PROMOTED]: 1000,
         [CAV]: 420, [CAV + PROMOTED]: 620,
         [ART]: 480, [ART + PROMOTED]: 620,
-        [AA]: 360, [ENG]: 420, [FTR]: 640, [BMB]: 720,
+        [AA]: 360, [ENG]: 420, [FTR]: 640, [BMB]: 600,
         [CMD]: 0
     };
 
@@ -246,9 +246,10 @@ function createSankaiEngine() {
                 slideMoves(list, board, side, from, piece, SKY, DIRS8, 3, true);
                 break;
             case BMB: {
-                slideMoves(list, board, side, from, piece, SKY, DIRS8, 2, false);
+                slideMoves(list, board, side, from, piece, SKY, DIRS8, 1, false);
+                // 司令官は 地下壕に いるので 爆撃できない（爆撃機の 王手が 終わらなく ならないように）
                 const below = idx(GROUND, x, y);
-                if (sideOf(board[below]) === -side) {
+                if (sideOf(board[below]) === -side && kindOf(board[below]) !== CMD) {
                     list.push({ kind: "shot", from, to: below, promote: false });
                 }
                 break;
@@ -314,7 +315,7 @@ function createSankaiEngine() {
         return -1;
     }
 
-    // 地上の マス sq を、by の 駒が 次の 手で 取れるか（動いて 取る・撃つ・爆撃・奇襲）
+    // 司令官の いる マス sq を、by の 駒が 次の 手で 取れるか（動いて 取る・撃つ・奇襲。司令官は 爆撃されない）
     function groundAttacked(board, sq, by) {
         const x = xOf(sq);
         const y = yOf(sq);
@@ -386,8 +387,8 @@ function createSankaiEngine() {
                 return true;
             }
         }
-        // 真上の 爆撃機・真下の 工兵
-        if (mine(board[idx(SKY, x, y)], BMB) || mine(board[idx(UNDER, x, y)], ENG)) {
+        // 真下の 工兵
+        if (mine(board[idx(UNDER, x, y)], ENG)) {
             return true;
         }
         return false;

@@ -93,6 +93,17 @@ test("爆撃機は 真下を 爆撃でき、対空砲は 上空 3×3 の 敵機�
     put(s, E.SKY, 7, 5, -E.FTR);
     const shots = E.legalMoves(s).filter(m => m.kind === "shot").map(m => m.to).sort((a, b) => a - b);
     assert.deepEqual(shots, [E.idx(E.GROUND, 3, 3), E.idx(E.SKY, 7, 5)].sort((a, b) => a - b));
+    const bomberMoves = E.legalMoves(s).filter(m => m.kind === "move" && m.from === E.idx(E.SKY, 3, 3));
+    assert.equal(bomberMoves.length, 8, "爆撃機は 周り 1 マスだけ 動ける");
+});
+
+test("司令官は 爆撃されない（真上に 敵の 爆撃機が いても 王手に ならない）", () => {
+    const s = emptyState();
+    put(s, E.GROUND, 4, 8, E.CMD);
+    put(s, E.GROUND, 0, 0, -E.CMD);
+    put(s, E.SKY, 0, 0, E.BMB);
+    assert.equal(E.legalMoves(s).some(m => m.kind === "shot"), false);
+    assert.equal(E.inCheck(Object.assign(s, { turn: E.GOTE }), E.GOTE), false);
 });
 
 test("工兵は 地下に もぐり、地下から 真上の 敵を 襲える", () => {
