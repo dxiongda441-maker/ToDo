@@ -1,0 +1,470 @@
+/* 三界戦棋：画面の スタイル */
+
+:root {
+    color-scheme: dark;
+    --bg: #12161f;
+    --panel: #1c2230;
+    --panel-2: #252d3f;
+    --line: #36405a;
+    --text: #eef1f8;
+    --muted: #a7b0c8;
+    --blue: #4f86e6;
+    --red: #e0574a;
+    --gold: #f2c94c;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: radial-gradient(circle at 50% 0%, #26304a, var(--bg) 60%);
+    color: var(--text);
+    font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Meiryo", system-ui, sans-serif;
+    min-height: 100vh;
+}
+
+.app {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 10px 16px 28px;
+    display: grid;
+    gap: 10px;
+}
+
+/* ---------- 上の 帯 ---------- */
+.top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+}
+
+.top h1 {
+    margin: 0;
+    font-size: 1.35rem;
+    letter-spacing: 0.06em;
+}
+
+.top .sub {
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+}
+
+.status {
+    flex: 1;
+    margin: 0;
+    min-width: 12em;
+    font-weight: bold;
+}
+
+.status.sente {
+    color: #9cc0ff;
+}
+
+.status.gote {
+    color: #ffaaa1;
+}
+
+.top-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+button {
+    font: inherit;
+    font-size: 0.85rem;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+}
+
+button:hover,
+button:focus-visible {
+    background: #313b55;
+}
+
+button:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+}
+
+button:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+button.primary {
+    background: #2b56b0;
+    border-color: #2b56b0;
+    color: #fff;
+    font-weight: bold;
+}
+
+/* ---------- 戦場 ---------- */
+.arena {
+    display: grid;
+    grid-template-columns: 150px 1fr 150px;
+    gap: 10px;
+    align-items: stretch;
+}
+
+.field {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 0 0 2px #2b3552, 0 18px 40px rgba(0, 0, 0, 0.5);
+    aspect-ratio: 4 / 5;
+    max-height: calc(100vh - 150px);
+    min-height: 420px;
+    width: 100%;
+    justify-self: center;
+}
+
+#scene {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    cursor: pointer;
+}
+
+.view-buttons {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    display: flex;
+    gap: 4px;
+}
+
+.focus-buttons {
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    display: flex;
+    gap: 4px;
+}
+
+.focus-buttons button,
+.view-buttons button {
+    background: rgba(18, 22, 31, 0.7);
+    padding: 4px 9px;
+}
+
+.focus-buttons button[aria-pressed="true"] {
+    background: #2b56b0;
+    border-color: #6f9cf0;
+}
+
+/* ---------- 持ち駒 ---------- */
+.hand {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 120px;
+}
+
+.hand h2 {
+    margin: 0 0 2px;
+    font-size: 0.82rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.hand h2::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--side-color);
+}
+
+.hand.turn {
+    box-shadow: 0 0 0 2px var(--side-color);
+}
+
+.hand-items {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+}
+
+.hand-item {
+    position: relative;
+    padding: 2px;
+    border-radius: 8px;
+    background: var(--panel-2);
+    display: grid;
+    justify-items: center;
+}
+
+.hand-item img {
+    width: 52px;
+    height: 52px;
+}
+
+.hand-item .count {
+    position: absolute;
+    right: 4px;
+    bottom: 2px;
+    font-weight: bold;
+    font-size: 0.8rem;
+}
+
+.hand-item .name {
+    font-size: 0.7rem;
+    color: var(--muted);
+}
+
+.hand-item.selected {
+    background: #6b5a1a;
+    box-shadow: 0 0 0 2px var(--gold);
+}
+
+.hand-empty {
+    color: var(--muted);
+    font-size: 0.75rem;
+}
+
+/* ---------- 演出の 帯（カットイン） ---------- */
+.cutin {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+}
+
+.cutin-band {
+    width: 140%;
+    padding: 14px 0;
+    transform: rotate(-8deg) translateX(-110%);
+    text-align: center;
+    background: linear-gradient(90deg, transparent, var(--band) 18%, var(--band) 82%, transparent);
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
+    animation: cutin 1.25s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.cutin-band .big {
+    display: block;
+    font-size: clamp(2rem, 9vw, 4.2rem);
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    color: #fff;
+    text-shadow: 0 0 12px rgba(255, 220, 120, 0.9), 3px 3px 0 #000;
+}
+
+.cutin-band .small {
+    display: block;
+    font-size: clamp(0.8rem, 3vw, 1.1rem);
+    color: #ffe9b0;
+    letter-spacing: 0.1em;
+}
+
+@keyframes cutin {
+    0% { transform: rotate(-8deg) translateX(-110%); }
+    22% { transform: rotate(-8deg) translateX(0); }
+    78% { transform: rotate(-8deg) translateX(0); opacity: 1; }
+    100% { transform: rotate(-8deg) translateX(110%); opacity: 0; }
+}
+
+/* ---------- 駒の 説明 ---------- */
+.info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 8px 12px;
+    min-height: 74px;
+}
+
+#info-art {
+    width: 56px;
+    height: 56px;
+    flex: none;
+}
+
+.info-name {
+    font-weight: bold;
+}
+
+.info-text {
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+/* ---------- 棋譜 ---------- */
+.log {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 8px 12px;
+}
+
+.log summary {
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.log ol {
+    margin: 8px 0 0;
+    padding-left: 2.4em;
+    max-height: 220px;
+    overflow: auto;
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+.links {
+    text-align: center;
+    margin: 0;
+}
+
+.links a {
+    color: #9cc0ff;
+}
+
+/* ---------- ダイアログ ---------- */
+.dialog {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 20px;
+    max-width: min(440px, 92vw);
+}
+
+.dialog.wide {
+    max-width: min(760px, 94vw);
+}
+
+.dialog::backdrop {
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.dialog h2 {
+    margin: 0 0 10px;
+    font-size: 1.15rem;
+}
+
+.dialog fieldset {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin: 0 0 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+}
+
+.dialog legend {
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+.dialog-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.rules-body p {
+    margin: 0 0 10px;
+    line-height: 1.7;
+    font-size: 0.92rem;
+}
+
+.rules-body .note {
+    color: var(--muted);
+}
+
+.rules-pieces {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+    margin: 0 0 10px;
+}
+
+.rules-piece {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: var(--panel-2);
+    border-radius: 10px;
+    padding: 6px;
+    font-size: 0.82rem;
+}
+
+.rules-piece img {
+    width: 56px;
+    height: 56px;
+    flex: none;
+}
+
+.rules-piece strong {
+    display: block;
+    font-size: 0.92rem;
+}
+
+/* ---------- せまい 画面 ---------- */
+@media (max-width: 760px) {
+    .arena {
+        grid-template-columns: 1fr;
+    }
+
+    .field {
+        order: 2;
+        aspect-ratio: 3 / 4;
+        max-height: none;
+        min-height: 0;
+    }
+
+    #hand-top {
+        order: 1;
+    }
+
+    #hand-bottom {
+        order: 3;
+    }
+
+    .hand {
+        min-height: 0;
+        flex-direction: row;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .hand h2 {
+        width: 100%;
+    }
+
+    .hand-items {
+        grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+        width: 100%;
+    }
+
+    .hand-item img {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cutin-band {
+        animation-duration: 0.01s;
+    }
+}

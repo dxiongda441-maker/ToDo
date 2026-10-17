@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>三界戦棋</title>
+    <meta name="description" content="空・地上・地下の 3 段で 戦う、立体の 戦争将棋。">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main class="app">
+        <header class="top">
+            <h1>三界戦棋 <span class="sub">さんかいせんぎ</span></h1>
+            <p id="status" class="status" aria-live="polite">準備中…</p>
+            <div class="top-buttons">
+                <button type="button" id="new-button">新しい対局</button>
+                <button type="button" id="undo-button">待った</button>
+                <button type="button" id="rules-button">ルール</button>
+                <button type="button" id="sound-button" aria-pressed="false">音：オフ</button>
+            </div>
+        </header>
+
+        <section class="arena">
+            <aside class="hand" id="hand-top" aria-label="上側の 持ち駒"></aside>
+
+            <div class="field">
+                <canvas id="scene" aria-label="戦場。空・地上・地下の 3 枚の 盤"></canvas>
+                <div id="cutin" class="cutin" aria-hidden="true"></div>
+                <div class="focus-buttons" role="group" aria-label="見る 段">
+                    <button type="button" data-focus="all" aria-pressed="true">全体</button>
+                    <button type="button" data-focus="2" aria-pressed="false">空</button>
+                    <button type="button" data-focus="1" aria-pressed="false">地上</button>
+                    <button type="button" data-focus="0" aria-pressed="false">地下</button>
+                </div>
+                <div class="view-buttons">
+                    <button type="button" id="rotate-left" title="左に 回す" aria-label="盤を 左に 回す">⟲</button>
+                    <button type="button" id="rotate-reset" title="正面に もどす" aria-label="盤を 正面に もどす">正面</button>
+                    <button type="button" id="rotate-right" title="右に 回す" aria-label="盤を 右に 回す">⟳</button>
+                    <button type="button" id="flip-button" title="上下 入れかえ" aria-label="盤を 反対側から 見る">反転</button>
+                </div>
+            </div>
+
+            <aside class="hand" id="hand-bottom" aria-label="下側の 持ち駒"></aside>
+        </section>
+
+        <section class="info" id="info" aria-live="polite">
+            <canvas id="info-art" width="128" height="128" aria-hidden="true"></canvas>
+            <div>
+                <div id="info-name" class="info-name">駒を えらぶと 動き方が 出ます</div>
+                <div id="info-text" class="info-text">青が 先手（下）、赤が 後手（上）。空・地上・地下の 3 枚の 盤で 戦います。</div>
+            </div>
+        </section>
+
+        <details class="log">
+            <summary>棋譜 <span id="log-count"></span></summary>
+            <ol id="log-list"></ol>
+        </details>
+
+        <p class="links"><a href="../index.html">← ゲーム一覧</a></p>
+    </main>
+
+    <!-- 対局の 準備 -->
+    <dialog id="setup-dialog" class="dialog">
+        <form method="dialog" id="setup-form">
+            <h2>新しい対局</h2>
+            <fieldset>
+                <legend>相手</legend>
+                <label><input type="radio" name="mode" value="cpu" checked> CPU</label>
+                <label><input type="radio" name="mode" value="local"> 2 人（1 台を 交代で）</label>
+                <label><input type="radio" name="mode" value="watch"> 観戦（CPU どうし）</label>
+            </fieldset>
+            <fieldset id="level-field">
+                <legend>CPU の 強さ</legend>
+                <label><input type="radio" name="level" value="easy"> やさしい</label>
+                <label><input type="radio" name="level" value="normal" checked> ふつう</label>
+                <label><input type="radio" name="level" value="hard"> つよい</label>
+            </fieldset>
+            <fieldset id="side-field">
+                <legend>あなたは</legend>
+                <label><input type="radio" name="side" value="1" checked> 先手（青・先に 指す）</label>
+                <label><input type="radio" name="side" value="-1"> 後手（赤）</label>
+            </fieldset>
+            <div class="dialog-buttons">
+                <button type="submit" value="start" class="primary">はじめる</button>
+            </div>
+        </form>
+    </dialog>
+
+    <!-- 成るか -->
+    <dialog id="promote-dialog" class="dialog small">
+        <form method="dialog">
+            <h2 id="promote-title">成りますか？</h2>
+            <p id="promote-text"></p>
+            <div class="dialog-buttons">
+                <button type="submit" value="yes" class="primary">成る</button>
+                <button type="submit" value="no">成らない</button>
+            </div>
+        </form>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result-dialog" class="dialog small">
+        <form method="dialog">
+            <h2 id="result-title"></h2>
+            <p id="result-text"></p>
+            <div class="dialog-buttons">
+                <button type="submit" value="again" class="primary">もう 1 局</button>
+                <button type="submit" value="close">盤を 見る</button>
+            </div>
+        </form>
+    </dialog>
+
+    <!-- ルール -->
+    <dialog id="rules-dialog" class="dialog wide">
+        <form method="dialog">
+            <h2>ルール</h2>
+            <div class="rules-body">
+                <p><strong>盤</strong>：9×9 の 盤が <strong>空・地上・地下</strong> の 3 枚。同じ 位置の マスは 縦に つながっている。
+                    自分に 近い 3 段が 自陣、相手に 近い 3 段が 敵陣。</p>
+                <p><strong>勝ち</strong>：相手の 司令官を 逃げられなく する（詰み）か、相手の <strong>本陣</strong>（相手の 司令官が 最初に いた 地上の マス・色の 枠）に
+                    自分の 駒を 入れて、相手の 手番を 1 回 しのいで 居続ける。</p>
+                <p><strong>持ち駒</strong>：取った 駒は 自分の 駒として 打てる。ただし <strong>援軍は 自陣にだけ</strong> 届く
+                    （飛行機は 自陣の 空、工兵は 自陣の 地上か 地下、ほかは 自陣の 地上）。同じ 列に 歩兵を 2 枚 置けない（二歩）。</p>
+                <p><strong>成る</strong>：歩兵・戦車・騎兵・砲兵は、敵陣に 入る（出る）ときに 成れる。一番 奥の 歩兵は 必ず 成る。</p>
+                <p><strong>撃つ</strong>：砲兵・対空砲・爆撃機は、動かずに 離れた 敵を 撃って 取れる（撃った 駒は その場に 残る）。司令官は 地下壕に いるので 爆撃されない。</p>
+                <div id="rules-pieces" class="rules-pieces"></div>
+                <p class="note">同じ 局面が 4 回 くり返されるか、400 手に なったら 引き分け。</p>
+            </div>
+            <div class="dialog-buttons">
+                <button type="submit" class="primary">とじる</button>
+            </div>
+        </form>
+    </dialog>
+
+    <!-- 読み込み順：engine → art → scene → ui -->
+    <script src="engine.js" defer></script>
+    <script src="art.js" defer></script>
+    <script src="scene.js" defer></script>
+    <script src="ui.js" defer></script>
+</body>
+</html>
