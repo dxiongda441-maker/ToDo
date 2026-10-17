@@ -26,11 +26,18 @@
         const hidden = new Set(); // 演出中は 盤から 消して 動く 絵で 描く
         const floating = []; // { key, side, promoted, pos: [x,y,z], alpha, angle }
         const effects = [];
+        const craters = []; // 爆発の あと（地上・地下）{ world, size, seed }
+        let layerAlpha = 1; // 見る 段を しぼったとき、上の 段を うすく する
         let shakeUntil = 0;
         let shakePower = 0;
         const clouds = Array.from({ length: 9 }, (_, i) => ({ x: -6 + ((i * 37) % 13), z: -5 + ((i * 53) % 11), s: 0.9 + ((i * 7) % 5) * 0.2, speed: 0.12 + (i % 3) * 0.05 }));
         // 地面の まだら模様（マスごとに 決まった 色）
         const groundTone = Array.from({ length: 81 }, (_, i) => ((i * 9301 + 49297) % 233280) / 233280);
+        // 地下の 岩の つぶ（マスごとに 決まった 位置）
+        const pebbles = Array.from({ length: 81 }, (_, i) => [0, 1, 2].map(j => {
+            const r = n => (((i * 7919 + j * 104729 + n * 1299709) % 10007) / 10007);
+            return { dx: r(1) - 0.5, dz: r(2) - 0.5, s: 0.05 + r(3) * 0.07 };
+        }));
 
         // ---------- 遠近法 ----------
         let cam = null;
@@ -178,6 +185,10 @@
                     fillPoly(poly, cellColor(layer, x, y, now), layer === 2 ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.18)");
                 }
             }
+            if (layer === 0) {
+                drawRocks();
+            }
+            drawCraters(layer);
             // 本陣（地上の 両はしの まんなか）
             if (layer === 1) {
                 [E.SENTE, E.GOTE].forEach(side => {
@@ -195,6 +206,124 @@
             ctx.lineWidth = 3;
             ctx.strokeText(E.LAYER_NAMES[layer], label[0], label[1]);
             ctx.fillText(E.LAYER_NAMES[layer], label[0], label[1]);
+        }
+
+        // 地下の 岩肌（つぶと ひび）
+        function drawRocks() {
+            const h = layerY(0);
+            ctx.fillStyle = "rgba(20, 12, 6, 0.45)";
+            for (let i = 0; i < 81; i += 1) {
+                const x = i % 9 - 4;
+                const z = Math.floor(i / 9) - 4;
+                pebbles[i].forEach(pb => {
+                    const c = project([x + pb.dx * 0.8, h, z + pb.dz * 0.8]);
+                    ctx.beginPath();
+                    ctx.ellipse(c[0], c[1], c[2] * pb.s, c[2] * pb.s * 0.5, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+        }
+
+        // 爆発の あと（焦げた 穴）。古いものほど うすい
+        function drawCraters(layer) {
+            craters.forEach((cr, i) => {
+                if (cr.layer !== layer) {
+                    return;
+                }
+                const c = project(cr.world);
+                const r = c[2] * cr.size;
+                const fade = 0.35 + 0.65 * ((i + 1) / craters.length);
+                const g = ctx.createRadialGradient(c[0], c[1], 0, c[0], c[1], r);
+                g.addColorStop(0, `rgba(25, 18, 12, ${0.7 * fade})`);
+                g.addColorStop(0.6, `rgba(60, 42, 25, ${0.45 * fade})`);
+                g.addColorStop(1, "rgba(60, 42, 25, 0)");
+                ctx.fillStyle = g;
+                ctx.beginPath();
+                ctx.ellipse(c[0], c[1], r, r * 0.45, 0, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function addCrater(world, big) {
+            const layer = world[1] > LAYER_GAP / 2 ? 2 : world[1] < -LAYER_GAP / 2 ? 0 : 1;
+            if (layer === 2) {
+                return;
+            }
+            craters.push({ world: [world[0] + (Math.random() - 0.5) * 0.2, layerY(layer), world[2] + (Math.random() - 0.5) * 0.2], size: big ? 0.62 : 0.42, layer });
+            if (craters.length > 28) {
+                craters.shift();
+            }
+        }
+
+        // 本陣の 砦（土のうの 囲いと 旗）。駒より 先に 描く 後ろ半分と、駒の 後に 描く 前半分に わける
+        function drawFort(side, front) {
+            const hq = E.honjinOf(side);
+            const cx = E.xOf(hq) - 4;
+            const cz = E.yOf(hq) - 4;
+            const bags = [];
+            for (let i = 0; i < 16; i += 1) {
+                const a = (i / 16) * Math.PI * 2;
+                bags.push([cx + Math.cos(a) * 0.5, cz + Math.sin(a) * 0.5]);
+            }
+            const depthOf = p => rawProject([p[0], 0, p[1]])[2];
+            const center = depthOf([cx, cz]);
+            bags.filter(b => (depthOf(b) < center) === front)
+                .sort((a, b) => depthOf(b) - depthOf(a))
+                .forEach(([x, z]) => {
+                    const c = project([x, 0.06, z]);
+                    const w = c[2] * 0.13;
+                    ctx.fillStyle = "#b39a6b";
+                    ctx.strokeStyle = "rgba(60, 45, 25, 0.8)";
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.ellipse(c[0], c[1], w, w * 0.6, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                });
+            if (!front) {
+                // 旗（奥の すみ）
+                const pole = [[0.42, 0.42], [-0.42, 0.42], [0.42, -0.42], [-0.42, -0.42]]
+                    .map(([dx, dz]) => [cx + dx, 0, cz + dz])
+                    .sort((p1, p2) => rawProject(p2)[2] - rawProject(p1)[2])[0];
+                const a = project(pole);
+                const b = project([pole[0], 1.5, pole[2]]);
+                ctx.strokeStyle = "#3b2e20";
+                ctx.lineWidth = Math.max(1.5, a[2] * 0.03);
+                ctx.beginPath();
+                ctx.moveTo(a[0], a[1]);
+                ctx.lineTo(b[0], b[1]);
+                ctx.stroke();
+                const wave = Math.sin(performance.now() / 300) * 0.08;
+                const f1 = project([pole[0] + 0.55, 1.38 + wave, pole[2]]);
+                const f2 = project([pole[0], 1.15, pole[2]]);
+                ctx.fillStyle = Art.PALETTE[side].main;
+                ctx.beginPath();
+                ctx.moveTo(b[0], b[1]);
+                ctx.lineTo(f1[0], f1[1]);
+                ctx.lineTo(f2[0], f2[1]);
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+
+        // 地下の 駒の まわりの ランプの 明かり
+        function drawLanterns() {
+            if (!state) {
+                return;
+            }
+            for (let i = 0; i < 81; i += 1) {
+                if (state.board[i] !== 0 && !hidden.has(i)) {
+                    const c = project(cellCenter(i));
+                    const r = c[2] * 1.1;
+                    const g = ctx.createRadialGradient(c[0], c[1], 0, c[0], c[1], r);
+                    g.addColorStop(0, "rgba(255, 200, 110, 0.45)");
+                    g.addColorStop(1, "rgba(255, 170, 70, 0)");
+                    ctx.fillStyle = g;
+                    ctx.beginPath();
+                    ctx.ellipse(c[0], c[1], r, r * 0.5, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
         }
 
         function cellColor(layer, x, y, now) {
@@ -226,14 +355,14 @@
                 const x = ((c.x + now / 1000 * c.speed + 7) % 14) - 7;
                 const p = project([x, LAYER_GAP - 0.6, c.z]);
                 const r = p[2] * c.s * 0.7;
-                ctx.globalAlpha = 0.2;
+                ctx.globalAlpha = 0.2 * layerAlpha;
                 ctx.fillStyle = "#ffffff";
                 [[0, 0, 1], [-0.7, 0.15, 0.7], [0.7, 0.18, 0.75], [0.25, -0.3, 0.65]].forEach(([dx, dy, rr]) => {
                     ctx.beginPath();
                     ctx.ellipse(p[0] + dx * r, p[1] + dy * r * 0.5, r * rr, r * rr * 0.5, 0, 0, Math.PI * 2);
                     ctx.fill();
                 });
-                ctx.globalAlpha = 1;
+                ctx.globalAlpha = layerAlpha;
             });
         }
 
@@ -312,12 +441,12 @@
         }
 
         // ---------- 駒 ----------
-        function drawPieceAt(info, world, alpha = 1, angle = 0, record = -1) {
+        function drawPieceAt(info, world, alpha = 1, angle = 0, record = -1, chute = false) {
             const base = project(world);
             const size = base[2] * 1.15;
             const img = Art.piece(info.key, info.side, info.promoted);
             ctx.save();
-            ctx.globalAlpha = alpha;
+            ctx.globalAlpha = alpha * layerAlpha;
             // 影
             if (E.isAir(info.kind) === false || world[1] < LAYER_GAP - 0.5) {
                 ctx.fillStyle = "rgba(0,0,0,0.28)";
@@ -336,9 +465,29 @@
                 ctx.rotate(angle);
             }
             ctx.drawImage(img, -size / 2, -size * 0.92, size, size);
+            if (chute) {
+                // 落下傘（援軍が 空から 降りてくる）
+                const top = -size * 1.75;
+                ctx.strokeStyle = "rgba(240, 240, 240, 0.85)";
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                [-0.42, 0, 0.42].forEach(dx => {
+                    ctx.moveTo(dx * size, top + size * 0.05);
+                    ctx.lineTo(0, -size * 0.62);
+                });
+                ctx.stroke();
+                ctx.fillStyle = info.side === E.SENTE ? "#dfe9ff" : "#ffe1dc";
+                ctx.beginPath();
+                ctx.ellipse(0, top + size * 0.05, size * 0.48, size * 0.3, 0, Math.PI, 0);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = Art.PALETTE[info.side].main;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
             ctx.restore();
             // 名前の 札
-            if (alpha > 0.6) {
+            if (alpha > 0.6 && !chute && layerAlpha > 0.5) {
                 const fs = Math.max(9, size * 0.2);
                 ctx.font = `bold ${fs}px "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif`;
                 ctx.textAlign = "center";
@@ -375,9 +524,28 @@
                     }
                 }
             }
-            floating.filter(f => f.layer === layer).forEach(f => items.push({ sq: -1, info: f.info, world: f.pos, depth: rawProject(f.pos)[2], alpha: f.alpha, angle: f.angle }));
+            // 落下傘で 降りる 駒の 影（どこに 降りるか 分かるように）
+            floating.filter(f => f.layer === layer && f.chute).forEach(f => {
+                const c = project([f.pos[0], layerY(layer), f.pos[2]]);
+                ctx.fillStyle = "rgba(0,0,0,0.3)";
+                ctx.beginPath();
+                ctx.ellipse(c[0], c[1], c[2] * 0.3, c[2] * 0.11, 0, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            floating.filter(f => f.layer === layer).forEach(f => items.push({ sq: -1, info: f.info, world: f.pos, depth: rawProject(f.pos)[2], alpha: f.alpha, angle: f.angle, chute: f.chute }));
             items.sort((a, b) => b.depth - a.depth);
-            items.forEach(item => drawPieceAt(item.info, item.world, item.alpha === undefined ? 1 : item.alpha, item.angle || 0, item.sq));
+            if (layer === 0) {
+                drawLanterns();
+            }
+            if (layer === 1) {
+                drawFort(E.SENTE, false);
+                drawFort(E.GOTE, false);
+            }
+            items.forEach(item => drawPieceAt(item.info, item.world, item.alpha === undefined ? 1 : item.alpha, item.angle || 0, item.sq, Boolean(item.chute)));
+            if (layer === 1) {
+                drawFort(E.SENTE, true);
+                drawFort(E.GOTE, true);
+            }
         }
 
         // 飛行機の 影を 地上に 落とす（どの マスの 上に いるかが 分かる）
@@ -434,10 +602,21 @@
             if (big) {
                 shake(9, 420);
             }
+            addCrater(world, big);
             return addEffect({
                 duration: big ? 1300 : 950,
                 draw(t) {
                     const k = t / this.duration;
+                    // 衝撃波の 輪（地面に 広がる）
+                    if (big && k < 0.6) {
+                        const c = project(world);
+                        const r = c[2] * (0.3 + k * 3.2);
+                        ctx.strokeStyle = `rgba(255, 240, 200, ${0.7 * (1 - k / 0.6)})`;
+                        ctx.lineWidth = Math.max(1, c[2] * 0.08 * (1 - k));
+                        ctx.beginPath();
+                        ctx.ellipse(c[0], c[1], r, r * 0.42, 0, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
                     // 光
                     if (k < 0.25) {
                         const c = project(world);
@@ -480,6 +659,18 @@
                 duration,
                 draw(t) {
                     const k = Math.min(1, t / duration);
+                    if (k < 0.18) {
+                        // 砲口の 光
+                        const c = project(from);
+                        const r = c[2] * 0.5 * (1 - k / 0.18);
+                        const g = ctx.createRadialGradient(c[0], c[1], 0, c[0], c[1], r);
+                        g.addColorStop(0, "rgba(255, 250, 210, 0.95)");
+                        g.addColorStop(1, "rgba(255, 160, 40, 0)");
+                        ctx.fillStyle = g;
+                        ctx.beginPath();
+                        ctx.arc(c[0], c[1], r, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                     const trail = [];
                     for (let i = 0; i < 8; i += 1) {
                         const kk = Math.max(0, k - i * 0.03);
@@ -521,16 +712,28 @@
         }
 
         // 爆弾（真下へ 落ちる）
-        function bomb(from, to, duration = 560) {
+        function bomb(from, to, duration = 720) {
             return addEffect({
                 duration,
                 draw(t) {
                     const k = Math.min(1, t / duration);
                     const kk = k * k;
                     const c = project([from[0], from[1] + (to[1] - from[1]) * kk, from[2]]);
-                    ctx.fillStyle = "#222";
+                    const w = c[2] * 0.11;
+                    ctx.fillStyle = "#2b2f33";
                     ctx.beginPath();
-                    ctx.ellipse(c[0], c[1], c[2] * 0.07, c[2] * 0.14, 0, 0, Math.PI * 2);
+                    ctx.ellipse(c[0], c[1], w, w * 2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 尾の 羽根
+                    ctx.beginPath();
+                    ctx.moveTo(c[0] - w * 1.3, c[1] - w * 2.6);
+                    ctx.lineTo(c[0] + w * 1.3, c[1] - w * 2.6);
+                    ctx.lineTo(c[0], c[1] - w * 1.4);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.fillStyle = "rgba(255,255,255,0.35)";
+                    ctx.beginPath();
+                    ctx.ellipse(c[0] - w * 0.35, c[1] - w * 0.4, w * 0.25, w * 0.8, 0, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.strokeStyle = "rgba(255,255,255,0.4)";
                     ctx.lineWidth = 1;
@@ -563,13 +766,13 @@
 
         // 絵を 動かす（from → to を duration で。path で 曲げられる）
         function tween(info, layer, from, to, duration, opts = {}) {
-            const f = { info, layer, pos: from.slice(), alpha: opts.alphaFrom === undefined ? 1 : opts.alphaFrom, angle: 0 };
+            const f = { info, layer, pos: from.slice(), alpha: opts.alphaFrom === undefined ? 1 : opts.alphaFrom, angle: 0, chute: Boolean(opts.chute) };
             floating.push(f);
             return addEffect({
                 duration,
                 draw(t) {
                     const k = Math.min(1, t / duration);
-                    const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+                    const e = opts.linear ? k : k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
                     f.pos = [from[0] + (to[0] - from[0]) * e, from[1] + (to[1] - from[1]) * e + (opts.hop ? Math.sin(e * Math.PI) * opts.hop : 0), from[2] + (to[2] - from[2]) * e];
                     if (opts.alphaTo !== undefined) {
                         f.alpha = (opts.alphaFrom === undefined ? 1 : opts.alphaFrom) + (opts.alphaTo - (opts.alphaFrom === undefined ? 1 : opts.alphaFrom)) * k;
@@ -598,11 +801,21 @@
             state = before;
             if (move.kind === "drop") {
                 const info = E.pieceInfo(move.piece * before.turn);
+                const layer = E.layerOf(move.to);
                 hidden.add(move.to);
                 state = after;
-                const from = [toWorld[0], toWorld[1] + 2.6, toWorld[2]];
                 const end = [toWorld[0], toWorld[1] + lift(move.to), toWorld[2]];
-                await tween(info, E.layerOf(move.to), from, end, 520, { alphaFrom: 0, alphaTo: 1 });
+                if (layer === 2) {
+                    // 自陣の 後ろから 飛んでくる
+                    const from = [end[0], end[1] + 0.3, end[2] + 6 * before.turn];
+                    await tween(info, layer, from, end, 700, { alphaFrom: 0, alphaTo: 1 });
+                } else if (layer === 0) {
+                    const from = [end[0], end[1] - 0.8, end[2]];
+                    await tween(info, layer, from, end, 520, { alphaFrom: 0, alphaTo: 1 });
+                } else {
+                    const from = [end[0] + 0.4, end[1] + 4.2, end[2]];
+                    await tween(info, layer, from, end, 1000, { alphaFrom: 0.6, alphaTo: 1, chute: true, linear: true });
+                }
                 hidden.delete(move.to);
                 dust(toWorld);
                 return;
@@ -670,17 +883,26 @@
             }
             hitBoxes = [];
             drawPillars();
+            const fade = layer => {
+                layerAlpha = view.focus !== "all" && layer > view.focus ? 0.28 : 1;
+                ctx.globalAlpha = layerAlpha;
+            };
+            fade(0);
             drawSlab(0, now);
             drawHighlights(0);
             drawLayerPieces(0);
+            fade(1);
             drawSlab(1, now);
             drawHighlights(1);
             drawAirShadows();
             drawLayerPieces(1);
+            fade(2);
             drawSlab(2, now);
             drawClouds(now);
             drawHighlights(2);
             drawLayerPieces(2);
+            layerAlpha = 1;
+            ctx.globalAlpha = 1;
             if (highlights.selected >= 0) {
                 drawColumn(highlights.selected, "rgba(255, 220, 80, 0.85)");
             }
@@ -763,6 +985,10 @@
 
         return {
             setState(next) {
+                // 待った・新しい 対局では 爆発の あとも 消す
+                if (!next || !state || next.ply < state.ply) {
+                    craters.length = 0;
+                }
                 state = next;
             },
             setHighlights(next) {

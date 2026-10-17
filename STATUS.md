@@ -1,6 +1,6 @@
 # 作業状況
 
-最終更新: 2026-10-10
+最終更新: 2026-10-17
 
 ルールは `CLAUDE.md`、ファイル構成は `README.md` を参照。
 
@@ -18,7 +18,7 @@
 | `claude/organize-file-directory-yq7io2` | ファイルを `css/`・`js/` に分割。`CLAUDE.md`・`README.md`・`tools/check.sh`・CI・`.editorconfig`・PR ひな形を追加 | 完了 |
 | `claude/sharp-bardeen-ydptez` | 上のブランチ ＋ スマホ幅でタスク一覧がはみ出す不具合の修正 | 完了 |
 | `claude/laughing-ptolemy-qju2td` | 上のブランチ ＋ `STATUS.md` と「`STATUS.md` を読む・更新する」ルール | PR #1 で `master` へのマージ待ち |
-| `claude/dreamy-albattani-0f40sg` | 上のブランチ ＋ ToDo の機能追加 ＋ ゲーム「うつろい」＋ RPG「ほしふるクエスト」＋ 集中タイマー・ゲーム一覧 | PR #2 で `master` へのマージ待ち |
+| `claude/dreamy-albattani-0f40sg` | 上のブランチ ＋ ToDo の機能追加 ＋ ゲーム「うつろい」＋ RPG「ほしふるクエスト」＋ 立体の戦争将棋「三界戦棋」＋ 集中タイマー・ゲーム一覧 | PR #2 で `master` へのマージ待ち |
 
 各ブランチは前のブランチの上に積み重なっている（`organize` ⊂ `sharp-bardeen` ⊂ `laughing-ptolemy` ⊂ `dreamy-albattani`）。
 
@@ -56,13 +56,19 @@
 - ToDo：くり返しのタスク（Daily / Weekdays / Weekly / Monthly）。保存形式には省略可能な `repeat`・`nextId`・`completedAt` を足しただけで、古いデータもそのまま読める。
   この 1 週間に終えた数、最後にバックアップした日（2 週間あくと知らせる）、RPG で受け取れる「がんばりのたね」の数（RPG を始めたときだけ）。
 - ゲーム一覧 `games/index.html`（それぞれの進み具合と、たねになるのを待っているタスクの数を表示）。
+- 立体の戦争将棋「三界戦棋」（`games/sankai/`）：空・地上・地下の 9×9×3 の盤。駒は 9 種類（司令官・歩兵・戦車・騎兵・砲兵・
+  対空砲・工兵・戦闘機・爆撃機）。持ち駒あり（自陣にだけ打てる）。勝ちは詰みか本陣占領。CPU 対戦（3 段階・Web Worker）と 2 人対戦。
+  戦場は canvas 2D で遠近法を計算して描き（3D ライブラリなし）、砲撃・爆撃・撃墜・工兵の奇襲・落下傘の援軍を演出つきで見せる。
+  将棋ウォーズのようなカットイン、爆発のあとのクレーター、本陣の砦と旗。テスト `tools/test-sankai.js`、
+  CPU 同士の対局 `tools/sankai-selfplay.js`（「やさしい」30 局で先手 13・後手 15・引き分け 2）。ルールは v0.1（遊んだ感想で直す前提）。
 
 ## 次にやること
 
 1. PR #2（`claude/dreamy-albattani-0f40sg` → `master`）を確認してマージする。PR #1 の内容も含むので、これだけで全部入る
    （PR #1 は、PR #2 をマージしたら閉じてよい）。途中で消したスクリーンショットが履歴に残らないよう、Squash and merge がおすすめ。
 2. ゲームを実際に何局か遊んで、難しさ（特に「やさしい」）や説明のわかりやすさについての感想を集める。
-3. ほしふるクエストを人が通して遊び、難しさ（特に ほらあなの いわおとこ・湖の神殿）と 迷いやすさの感想を集める。
+3. 三界戦棋を遊んでもらい、駒の動き・強さ（爆撃機が強すぎないか）・見た目の感想を集める。ルールは `games/sankai/engine.js`。
+4. ほしふるクエストを人が通して遊び、難しさ（特に ほらあなの いわおとこ・湖の神殿）と 迷いやすさの感想を集める。
    数字は `games/hoshifuru/data.js`、確かめ方は `games/hoshifuru/README.md`。
 
 ## 更新のしかた

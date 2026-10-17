@@ -527,6 +527,13 @@ function createSankaiEngine() {
             if (kind === INF || kind === CAV || kind === ART) {
                 bonus += advance * 6;
             }
+            if (kind === FTR || kind === BMB) {
+                // 飛行機は 前に 出るほど、爆撃機は 真下に 敵が いると 加点
+                bonus += advance * 4;
+                if (kind === BMB && sideOf(board[sq - LAYER_CELLS]) === -s) {
+                    bonus += 30;
+                }
+            }
             if (kind !== CMD && layerOf(sq) === GROUND) {
                 // 相手の 本陣に 近いほど 少し 加点（占領の ねらい）
                 const h = honjinOf(-s);
@@ -537,7 +544,7 @@ function createSankaiEngine() {
         }
         [SENTE, GOTE].forEach(s => {
             HAND_TYPES.forEach(kind => {
-                score += s * state.hands[s][kind] * VALUE[kind] * 1.08;
+                score += s * state.hands[s][kind] * VALUE[kind] * 0.97;
             });
             // 司令官の まわりの 味方（守り）
             const c = findCommander(board, s);
@@ -735,6 +742,12 @@ function createSankaiEngine() {
                 } else {
                     const inner = cloneState(next);
                     s = -search(inner, -side, depth - 1, -Infinity, alpha === -Infinity ? Infinity : -alpha + 400, ctx, 1);
+                    // 同じ 局面に もどる 手は、有利なら 避ける（追いかけっこで 千日手に ならないように）
+                    const key = next.history[next.history.length - 1];
+                    const seen = next.history.filter(k => k === key).length - 1;
+                    if (seen > 0 && s > -200) {
+                        s = Math.min(s, 0) - 40 * seen;
+                    }
                 }
                 if (ctx.stopped && depth > 1) {
                     break;
