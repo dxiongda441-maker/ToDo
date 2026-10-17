@@ -31,14 +31,15 @@
     const settings = Object.assign({ sound: false }, load(SETTINGS_KEY, {}));
 
     // ---------- 対局の 状態 ----------
-    let game = null; // { mode: "cpu" | "local", level, human, moves: [], states: [] }
+    let game = null; // { mode: "cpu" | "local" | "watch"（CPU どうしを 見る）, level, human, moves: [], states: [] }
     let selected = null; // { sq } か { drop: kind }
     let targets = []; // いまの 選択で 行ける 手
     let busy = false; // 演出中・CPU の 考え中
     let hover = -1;
 
     const current = () => game.states[game.states.length - 1];
-    const isHumanTurn = () => !current().result && (game.mode === "local" || current().turn === game.human);
+    const isCpuTurn = state => game.mode === "watch" || (game.mode === "cpu" && state.turn !== game.human);
+    const isHumanTurn = () => !current().result && !isCpuTurn(current());
     const sideName = side => (side === E.SENTE ? "先手（青）" : "後手（赤）");
 
     // ---------- 音（その場で 作る） ----------
@@ -279,7 +280,7 @@ self.onmessage = event => {
     let thinkId = 0;
     function maybeCpu() {
         const state = current();
-        if (game.mode !== "cpu" || state.result || state.turn === game.human || busy) {
+        if (!isCpuTurn(state) || state.result || busy) {
             return;
         }
         busy = true;
@@ -297,7 +298,7 @@ self.onmessage = event => {
                 }
                 busy = false;
                 commit(move);
-            }, Math.max(0, 500 - (Date.now() - started)));
+            }, Math.max(0, (game.mode === "watch" ? 900 : 500) - (Date.now() - started)));
         };
         const w = getWorker();
         if (w) {
@@ -488,7 +489,7 @@ self.onmessage = event => {
         el.style.setProperty("--side-color", side === E.SENTE ? "var(--blue)" : "var(--red)");
         el.classList.toggle("turn", !state.result && state.turn === side);
         const title = document.createElement("h2");
-        const who = game.mode === "cpu" ? (side === game.human ? "あなた" : "CPU") : "";
+        const who = game.mode === "watch" ? "CPU" : game.mode === "cpu" ? (side === game.human ? "あなた" : "CPU") : "";
         title.textContent = `${sideName(side)}${who ? `・${who}` : ""}の 持ち駒`;
         el.appendChild(title);
         const items = document.createElement("div");
@@ -552,12 +553,12 @@ self.onmessage = event => {
         status.classList.toggle("gote", state.turn === E.GOTE);
         if (state.result) {
             status.textContent = state.result.winner === 0 ? "引き分け" : `${sideName(state.result.winner)}の 勝ち`;
-        } else if (game.mode === "cpu" && state.turn !== game.human) {
+        } else if (isCpuTurn(state)) {
             status.textContent = `${state.ply + 1} 手目：CPU（${sideName(state.turn)}）が 考えています…`;
         } else {
             status.textContent = `${state.ply + 1} 手目：${sideName(state.turn)}${game.mode === "cpu" ? "（あなた）" : ""}の 番${E.inCheck(state, state.turn) ? "　司令官が ねらわれている！" : ""}`;
         }
-        $("#undo-button").disabled = busy || game.moves.length === 0;
+        $("#undo-button").disabled = busy || game.moves.length === 0 || game.mode === "watch";
         $("#sound-button").textContent = `音：${settings.sound ? "オン" : "オフ"}`;
         $("#sound-button").setAttribute("aria-pressed", String(settings.sound));
     }
@@ -606,7 +607,7 @@ self.onmessage = event => {
     }
 
     function undo() {
-        if (busy || game.moves.length === 0) {
+        if (busy || game.moves.length === 0 || game.mode === "watch") {
             return;
         }
         thinkId += 1;
@@ -641,9 +642,9 @@ self.onmessage = event => {
     }
 
     $("#setup-form").addEventListener("change", () => {
-        const local = new FormData($("#setup-form")).get("mode") === "local";
-        $("#level-field").disabled = local;
-        $("#side-field").disabled = local;
+        const mode = new FormData($("#setup-form")).get("mode");
+        $("#level-field").disabled = mode === "local";
+        $("#side-field").disabled = mode !== "cpu";
     });
     $("#new-button").addEventListener("click", openSetup);
     $("#undo-button").addEventListener("click", undo);

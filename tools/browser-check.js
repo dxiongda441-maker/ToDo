@@ -353,6 +353,11 @@ async function checkSankai(browser, width) {
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     check(scrollWidth <= width, `横にはみ出さない（${scrollWidth}px）`);
     await checkAccessibility(page, "三界戦棋");
+    // 観戦：CPU どうしが 指し進める
+    await page.evaluate(() => localStorage.setItem("sankai.game.v1", JSON.stringify({ mode: "watch", level: "easy", human: 1, moves: [] })));
+    await page.reload();
+    await page.waitForFunction(() => window.SankaiDebug.game.moves.length >= 2, null, { timeout: 20000 });
+    check(await page.evaluate(() => document.querySelector("#undo-button").disabled), "観戦で CPU どうしが 指し進める（待ったは 使えない）");
     check(errors.length === 0, `JavaScript のエラーなし ${errors.join(" / ")}`);
     await page.close();
 }
