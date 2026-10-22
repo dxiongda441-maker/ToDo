@@ -1,0 +1,14 @@
+{
+  "name": "まなびログ",
+  "short_name": "まなびログ",
+  "description": "理解度に合わせて出題し、理解度・定着度を数値化する学習アプリ",
+  "lang": "ja",
+  "start_url": "./#/home",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#2563eb",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

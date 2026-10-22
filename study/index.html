@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>まなびログ</title>
+    <meta name="description" content="理解度に合わせて出題し、理解度・定着度を数値化する学習アプリ">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <a class="skip-link" href="#view">本文へ移動</a>
+    <header class="topbar">
+        <a class="brand" href="#/home"><img src="icon.svg" alt="" width="28" height="28"> まなびログ</a>
+        <nav class="nav" aria-label="メイン">
+            <a class="nav__link" data-route="home" href="#/home"><span aria-hidden="true">🏠</span>ホーム</a>
+            <a class="nav__link" data-route="study" href="#/study"><span aria-hidden="true">✏️</span>学習</a>
+            <a class="nav__link" data-route="plan" href="#/plan"><span aria-hidden="true">🗓️</span>計画</a>
+            <a class="nav__link" data-route="progress" href="#/progress"><span aria-hidden="true">📈</span>成長記録</a>
+            <a class="nav__link" data-route="settings" href="#/settings"><span aria-hidden="true">⚙️</span>設定</a>
+        </nav>
+    </header>
+    <main id="view" class="view" tabindex="-1">
+        <noscript>このアプリを使うには JavaScript を有効にしてください。</noscript>
+    </main>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>

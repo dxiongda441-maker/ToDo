@@ -1,0 +1,11 @@
+{
+  "name": "gakushu",
+  "private": true,
+  "version": "0.1.0",
+  "description": "理解度に合わせて出題し、理解度・定着度を数値化する学習アプリ",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\"",
+    "start": "npx --yes http-server . -p 8080 -c-1"
+  }
+}
