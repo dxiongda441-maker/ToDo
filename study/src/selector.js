@@ -22,6 +22,7 @@ export function matchesType(question, typeFilter) {
  * @param ctx.focusTopics  今日の重点トピック
  * @param ctx.typeFilter   "auto" | "choice" | "cloze" | "free" | "code" | 形式名の配列
  * @param ctx.exclude      このセッションで出題済みの ID（Set）
+ * @param ctx.allowedTopics 新しく出題してよいトピック（Set。省略時はすべて）。復習は対象外
  * @returns { question, reason } | null
  */
 export function pickNext(ctx) {
@@ -41,7 +42,8 @@ export function pickNext(ctx) {
     const due = pool
         .filter(q => isDue(save.items[q.id], now))
         .sort((a, b) => save.items[a.id].due - save.items[b.id].due);
-    const fresh = pool.filter(q => !save.items[q.id]?.lastAt);
+    const allowed = ctx.allowedTopics;
+    const fresh = pool.filter(q => !save.items[q.id]?.lastAt && (!allowed || allowed.has(q.topic)));
 
     if (due.length > 0 && (fresh.length === 0 || random() < 0.5)) {
         return { question: due[0], reason: "review" };
@@ -65,7 +67,8 @@ export function pickNext(ctx) {
     }
 
     const seen = pool
-        .filter(q => !isDue(save.items[q.id], now))
+        .filter(q => save.items[q.id]?.lastAt && !isDue(save.items[q.id], now))
+        .filter(q => !allowed || allowed.has(q.topic))
         .sort((a, b) => {
             const sa = save.items[a.id];
             const sb = save.items[b.id];
@@ -79,13 +82,16 @@ export function aiRequestFor(save, subject, focusTopics, typeFilter, random = Ma
     const topics = focusTopics.length ? focusTopics : subject.topics.map(t => t.id);
     const topicId = topics[Math.floor(random() * topics.length)];
     const ability = topicAbility(save, topicId);
+    const topic = subject.topics.find(t => t.id === topicId);
+    // トピックごとに出せる形式が決まっている場合（例: Python の「コードを書く」はコード問題だけ）
+    const topicTypes = topic?.types || ["choice", "cloze", "free", ...(subject.allowCode ? ["code"] : [])];
+    const requested = Array.isArray(typeFilter)
+        ? typeFilter
+        : typeFilter && typeFilter !== "auto" ? [typeFilter] : topicTypes;
+    const options = requested.filter(t => topicTypes.includes(t));
+    const candidates = options.length ? options : topicTypes;
     const preferred = preferredType(ability, Boolean(subject.allowCode));
-    let type;
-    if (Array.isArray(typeFilter)) {
-        type = typeFilter.includes(preferred) ? preferred : typeFilter[Math.floor(random() * typeFilter.length)];
-    } else {
-        type = typeFilter && typeFilter !== "auto" ? typeFilter : preferred;
-    }
+    let type = candidates.includes(preferred) ? preferred : candidates[Math.floor(random() * candidates.length)];
     if (type === "code" && !subject.allowCode) type = "free";
     return { topicId, difficulty: targetDifficulty(ability), type };
 }

@@ -66,7 +66,9 @@ for (const subject of SUBJECTS) {
 }
 
 test("Python: 選択問題の正解が、実際にコードを実行した結果と一致する", () => {
-    const targets = allQuestions.filter(q => q.subject === "python" && q.type === "choice" && q.code);
+    // 「出力はどれか」「発生する例外はどれか」の問題だけ（コードを見せて直し方などを問う問題は除く）
+    const targets = allQuestions.filter(q =>
+        q.subject === "python" && q.type === "choice" && q.code && /出力|例外/.test(q.prompt));
     assert.ok(targets.length > 10);
     for (const q of targets) {
         const script = [
@@ -87,6 +89,15 @@ test("Python: 選択問題の正解が、実際にコードを実行した結果
         } else {
             assert.equal(out, expected, `${q.id}: 実行結果 ${out} ≠ 正解の選択肢 ${expected}`);
         }
+    }
+});
+
+test("Python: 選択肢がコードの問題は、正解の選択肢が Python として正しい文法である", () => {
+    const targets = allQuestions.filter(q => q.codeChoices && q.subject === "python");
+    assert.ok(targets.length > 0);
+    for (const q of targets) {
+        const result = python(["-c", `compile(${JSON.stringify(q.choices[q.answer])}, "<choice>", "exec")`]);
+        assert.equal(result.status, 0, `${q.id}: 正解の選択肢がコンパイルできない ${result.stderr}`);
     }
 });
 

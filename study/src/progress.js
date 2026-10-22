@@ -48,16 +48,58 @@ export function recordAttempt(save, subject, question, score, context = {}, now 
     return { abilityBefore: before, abilityAfter: save.topics[question.topic].ability };
 }
 
+/**
+ * 実力テスト・診断テストの結果を記録する。
+ * kind・topics（分野別の内訳）・report（Claude に送る用のテキスト）は v0.2 で追加した
+ * 任意フィールド。古い記録にはないので、読むときは無い場合も考える（スキーマ変更ではない）。
+ */
 export function recordTest(save, subject, result, now = Date.now()) {
-    save.tests.push({
+    const record = {
         id: generateId("t"),
         at: now,
         subject: subject.id,
+        kind: result.kind || "test",
         score: result.score,
         total: result.total,
         percent: result.total ? (result.score / result.total) * 100 : 0,
         understanding: subjectUnderstanding(save, subject).understanding
-    });
+    };
+    if (result.topics) record.topics = result.topics;
+    if (result.report) record.report = result.report;
+    save.tests.push(record);
+    return record;
+}
+
+/** その科目の最新の診断テスト（なければ null） */
+export function latestDiagnostic(save, subjectId) {
+    for (let i = save.tests.length - 1; i >= 0; i -= 1) {
+        const test = save.tests[i];
+        if (test.subject === subjectId && test.kind === "diagnostic") return test;
+    }
+    return null;
+}
+
+/** 1 問ごとのこれまでの結果（次に同じ問題を解くときに表示する） */
+export function questionHistory(save, qid) {
+    const attempts = save.attempts.filter(a => a.qid === qid);
+    if (attempts.length === 0) return null;
+    const last = attempts[attempts.length - 1];
+    return {
+        count: attempts.length,
+        correct: attempts.filter(a => a.score >= 0.99).length,
+        lastAt: last.at,
+        lastScore: last.score
+    };
+}
+
+/** そのトピックで最近間違えた問題の ID（新しい順、重複なし） */
+export function recentMistakes(save, topicId, limit = 5) {
+    const ids = [];
+    for (let i = save.attempts.length - 1; i >= 0 && ids.length < limit; i -= 1) {
+        const a = save.attempts[i];
+        if (a.topic === topicId && a.score < 0.6 && !ids.includes(a.qid)) ids.push(a.qid);
+    }
+    return ids;
 }
 
 export function answeredToday(save, subjectId, now = Date.now()) {

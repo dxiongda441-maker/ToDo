@@ -1,10 +1,11 @@
 // 計画画面: 目標の設定と、学習計画（段階・期間）の表示。
 
 import { abilityLabel } from "../mastery.js";
-import { STAGE_CLEAR_ABILITY, buildDeadlineSchedule, goalMode, stageProgress, todayPlan } from "../planner.js";
+import { STAGE_CLEAR_ABILITY, buildDeadlineSchedule, goalMode, stageProgress, todayPlan, unlockedStageCount } from "../planner.js";
+import { latestDiagnostic } from "../progress.js";
 import { topicName } from "../content/index.js";
 import { toDateKey } from "../util.js";
-import { append, formatDate, h, meter, toast } from "./dom.js";
+import { append, copyReport, formatDate, formatDateTime, h, meter, toast } from "./dom.js";
 
 function subjectTabs(app, current) {
     return h("nav", { class: "tabs", "aria-label": "科目" }, app.subjects().map(subject =>
@@ -108,17 +109,31 @@ function scheduleView(app, subject) {
     }
 
     if (mode === "milestone") {
+        const unlocked = unlockedStageCount(app.save, subject);
+        const unlock = index => {
+            if (!confirm(`「${subject.stages[index].title}」に進みます。前の段階の問題も引き続き出題されます。よろしいですか？`)) return;
+            state.unlockedStages = index + 1;
+            if (app.commit()) toast("次の段階に進みました");
+            app.rerender();
+        };
         return h("section", { class: "card" },
-            h("h2", { class: "section-title" }, "段階（すべてのトピックが理解度 60 以上でクリア）"),
-            h("ol", { class: "timeline" }, subject.stages.map(stage => {
+            h("h2", { class: "section-title" }, `段階（すべてのトピックが理解度 ${STAGE_CLEAR_ABILITY} 以上でクリア）`),
+            subject.lockStages
+                ? h("p", { class: "muted" }, "前の段階をクリアすると、次の段階の問題が出るようになります（🔒 はまだ出題されません）。自信があれば先に進むこともできます。")
+                : null,
+            h("ol", { class: "timeline" }, subject.stages.map((stage, index) => {
                 const progress = stageProgress(app.save, stage);
                 const current = plan.phase.stageId === stage.id;
-                return h("li", { class: `timeline__item ${current ? "is-current" : ""} ${progress.cleared ? "is-cleared" : ""}` },
+                const locked = index >= unlocked;
+                return h("li", { class: `timeline__item ${current ? "is-current" : ""} ${progress.cleared ? "is-cleared" : ""} ${locked ? "is-locked" : ""}` },
                     h("div", { class: "timeline__head" },
-                        h("strong", {}, stage.title),
+                        h("strong", {}, `${locked ? "🔒 " : ""}${index + 1}. ${stage.title}`),
                         current ? h("span", { class: "chip chip--now" }, "挑戦中") : null,
                         progress.cleared ? h("span", { class: "chip chip--ok" }, "クリア") : null),
-                    topicRows(app, stage.topics));
+                    topicRows(app, stage.topics),
+                    locked && index === unlocked
+                        ? h("button", { class: "btn btn--small", type: "button", onclick: () => unlock(index) }, "この段階に進む")
+                        : null);
             })));
     }
 
@@ -127,6 +142,29 @@ function scheduleView(app, subject) {
         h("p", {}, "目標がまだ決まっていない科目は、すべてのトピックをまんべんなく出題して幅広い基礎を作ります。まだ触っていないトピックから優先して出題します。"),
         h("p", { class: "muted" }, "全体像がつかめてきたら、上の「目標」から候補を選ぶか、自分で目標を決めてください。"),
         topicRows(app, subject.topics.map(t => t.id)));
+}
+
+function diagnosticCard(app, subject) {
+    const test = latestDiagnostic(app.save, subject.id);
+    const start = h("a", { class: "btn btn--primary", href: `#/study?subject=${subject.id}&mode=diagnostic` },
+        test ? "もう一度診断テストを受ける" : "診断テストを受ける");
+    if (!test) {
+        return h("section", { class: "card" },
+            h("h2", { class: "section-title" }, "診断テスト"),
+            h("p", {}, "全分野から同じ数ずつ出題して、今の実力を分野別に測ります。結果に合わせて、これからの出題（難易度・重点分野）が変わります。"),
+            h("div", { class: "actions" }, start));
+    }
+    return h("section", { class: "card" },
+        h("h2", { class: "section-title" }, `前回の診断テスト（${formatDateTime(test.at)}）: ${Math.round(test.percent)}%`),
+        h("ul", { class: "diag-list" }, (test.topics || []).map(t =>
+            h("li", {},
+                h("span", {}, topicName(t.topicId)),
+                h("span", {}, `${t.correct} / ${t.total}`),
+                h("span", { class: `verdict-chip verdict-chip--${t.verdict}` },
+                    { strong: "得意", ok: "おおむね理解", review: "要復習", weak: "苦手" }[t.verdict] ?? t.verdict)))),
+        h("div", { class: "actions" },
+            start,
+            test.report ? h("button", { class: "btn", type: "button", onclick: () => copyReport(test.report) }, "結果をコピー（Claude に送る用）") : null));
 }
 
 export function renderPlan(app, root, params) {
@@ -144,6 +182,7 @@ export function renderPlan(app, root, params) {
         subjectTabs(app, subject.id),
         h("p", { class: "lead" }, `${subject.icon} ${subject.name} — ${subject.description}`),
         goalForm(app, subject),
+        subject.diagnostic ? diagnosticCard(app, subject) : null,
         scheduleView(app, subject),
         subject.resources?.length
             ? h("section", { class: "card" },

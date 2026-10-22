@@ -8,13 +8,15 @@ import { renderStudy } from "./ui/study.js";
 import { renderPlan } from "./ui/plan.js";
 import { renderProgress } from "./ui/progress.js";
 import { renderSettings } from "./ui/settings.js";
+import { renderHelp } from "./ui/help.js";
 
 const ROUTES = {
     home: { title: "ホーム", render: renderHome },
     study: { title: "学習", render: renderStudy },
     plan: { title: "計画", render: renderPlan },
     progress: { title: "成長記録", render: renderProgress },
-    settings: { title: "設定", render: renderSettings }
+    settings: { title: "設定", render: renderSettings },
+    help: { title: "使い方", render: renderHelp }
 };
 
 function createApp(storage) {

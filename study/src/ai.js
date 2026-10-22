@@ -113,7 +113,10 @@ const TYPE_INSTRUCTIONS = {
 };
 
 /** 問題作成リクエストの中身（SDK に渡す前の純粋な部分。テストしやすいよう分けている） */
-export function buildQuestionRequest({ subject, topic, type, difficulty, recentPrompts = [] }) {
+/**
+ * @param learner これまでの結果 { ability: number|null, mistakes: [問題文] }（任意）
+ */
+export function buildQuestionRequest({ subject, topic, type, difficulty, recentPrompts = [], learner = null }) {
     const system = [
         "あなたは日本語で学習用の問題を作る、経験豊富な講師です。",
         "事実として正確で、答えが一意に定まる問題だけを作ってください。自信のない知識は使わないでください。",
@@ -122,7 +125,7 @@ export function buildQuestionRequest({ subject, topic, type, difficulty, recentP
 
     const lines = [
         `科目: ${subject.name}（${subject.description}）`,
-        `トピック: ${topic.name}`,
+        `トピック: ${topic.name}${topic.aiHint ? `（${topic.aiHint}）` : ""}`,
         `難易度: ${difficulty} / 5 … ${DIFFICULTY_TEXT[difficulty]}`,
         `形式: ${TYPE_LABELS[type]} … ${TYPE_INSTRUCTIONS[type]}`
     ];
@@ -131,6 +134,15 @@ export function buildQuestionRequest({ subject, topic, type, difficulty, recentP
     }
     if (subject.id === "english") {
         lines.push("問題文と解説は日本語、英語の部分は自然な日常英語にしてください。");
+    }
+    if (learner) {
+        lines.push(learner.ability === null || learner.ability === undefined
+            ? "この学習者はこのトピックをまだ解いたことがありません。"
+            : `この学習者のこのトピックの理解度: ${Math.round(learner.ability)} / 100`);
+        if (learner.mistakes?.length) {
+            lines.push("この学習者が最近このトピックで間違えた問題（同じ問題は出さず、つまずいている考え方を補う問題にしてください）:");
+            for (const prompt of learner.mistakes.slice(0, 5)) lines.push(`- ${prompt.replace(/\s+/g, " ").slice(0, 100)}`);
+        }
     }
     if (recentPrompts.length > 0) {
         lines.push("次の問題とは内容が重ならないようにしてください:");

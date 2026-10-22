@@ -2,10 +2,10 @@
 
 import { abilityLabel, predictedExamScore, subjectRetention, subjectUnderstanding } from "../mastery.js";
 import { todayPlan } from "../planner.js";
-import { answeredToday, streakDays } from "../progress.js";
+import { answeredToday, latestDiagnostic, streakDays } from "../progress.js";
 import { topicName } from "../content/index.js";
 import { DAY_MS } from "../util.js";
-import { append, h, meter, percent } from "./dom.js";
+import { append, formatDateTime, h, meter, percent } from "./dom.js";
 
 const BACKUP_REMIND_DAYS = 7;
 
@@ -41,6 +41,8 @@ function subjectCard(app, subject) {
     const predicted = predictedExamScore(app.save, subject);
     const done = answeredToday(app.save, subject.id);
     const quota = state.dailyQuota;
+    const diagnostic = subject.diagnostic ? latestDiagnostic(app.save, subject.id) : null;
+    const startDiagnostic = () => app.navigate("study", { subject: subject.id, mode: "diagnostic" });
 
     const goalLine = plan.mode === "explore"
         ? "目標未設定（まずは幅広く基礎から）"
@@ -71,6 +73,8 @@ function subjectCard(app, subject) {
                     h("span", { class: "metric__sub" }, `合格ライン ${percent(subject.exam.passRatio)}`))
                 : null),
 
+        subject.diagnostic ? diagnosticLine(diagnostic) : null,
+
         h("div", { class: "today" },
             h("div", { class: "today__row" },
                 h("span", {}, "今日の目標"),
@@ -86,11 +90,41 @@ function subjectCard(app, subject) {
             : null,
 
         h("div", { class: "actions" },
-            h("button", { class: "btn btn--primary", onclick: () => app.navigate("study", { subject: subject.id }) }, "学習する"),
+            subject.diagnostic && !diagnostic
+                ? h("button", { class: "btn btn--primary", onclick: startDiagnostic }, "診断テストを受ける")
+                : null,
+            h("button", { class: `btn ${subject.diagnostic && !diagnostic ? "" : "btn--primary"}`, onclick: () => app.navigate("study", { subject: subject.id }) }, "学習する"),
+            subject.diagnostic && diagnostic
+                ? h("button", { class: "btn", onclick: startDiagnostic }, "もう一度診断")
+                : null,
             dueCount > 0
                 ? h("button", { class: "btn", onclick: () => app.navigate("study", { subject: subject.id, start: "1", review: "1" }) }, `復習 ${dueCount} 問`)
                 : null,
             h("button", { class: "btn btn--ghost", onclick: () => app.navigate("plan", { subject: subject.id }) }, "計画")));
+}
+
+function diagnosticLine(test) {
+    if (!test) {
+        return h("p", { class: "diagnostic-line" },
+            "まずは「診断テスト」で今の実力を分野別に測りましょう。結果に合わせて出題が変わります。");
+    }
+    const weak = (test.topics || []).filter(t => t.verdict === "weak" || t.verdict === "review")
+        .sort((a, b) => a.rate - b.rate)
+        .map(t => topicName(t.topicId));
+    return h("p", { class: "diagnostic-line" },
+        h("strong", {}, `前回の診断（${formatDateTime(test.at).split(" ")[0]}）: ${Math.round(test.percent)}%`),
+        weak.length ? `・苦手: ${weak.join("・")}` : "・苦手な分野なし");
+}
+
+function welcomeCard(app) {
+    return h("section", { class: "card welcome" },
+        h("h2", { class: "section-title" }, "はじめての方へ"),
+        h("ol", { class: "steps" },
+            h("li", {}, h("strong", {}, "科目のカードで「学習する」"), "（FE は「診断テストを受ける」）を押す"),
+            h("li", {}, h("strong", {}, "問題に答える"), "と、正解・解説と理解度の変化が表示される"),
+            h("li", {}, h("strong", {}, "結果は自動で保存"), "され、次回は苦手な問題や復習の時期が来た問題から出題される")),
+        h("div", { class: "actions" },
+            h("a", { class: "btn", href: "#/help" }, "くわしい使い方を見る")));
 }
 
 export function renderHome(app, root) {
@@ -103,10 +137,12 @@ export function renderHome(app, root) {
             h("div", {},
                 h("h1", { class: "hero__title" }, "今日もコツコツ。"),
                 h("p", { class: "hero__text" },
-                    "理解度に合わせて出題し、できるようになったことを数字で確認できます。")),
+                    "理解度に合わせて出題し、できるようになったことを数字で確認できます。",
+                    h("a", { href: "#/help", class: "hero__help" }, "使い方"))),
             h("div", { class: "hero__stats" },
                 h("div", { class: "hero__stat" }, h("strong", {}, String(streak)), h("span", {}, "日連続")),
                 h("div", { class: "hero__stat" }, h("strong", {}, String(totalToday)), h("span", {}, "今日解いた問題")))),
+        app.save.attempts.length === 0 ? welcomeCard(app) : null,
         h("section", { class: "grid" }, app.subjects().map(subject => subjectCard(app, subject)))
     ]);
 }

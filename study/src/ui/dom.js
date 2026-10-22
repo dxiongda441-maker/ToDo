@@ -138,6 +138,22 @@ export function downloadText(filename, text, type = "application/json") {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** 診断テストの結果テキストをクリップボードへ（できなければファイルとして保存） */
+export function copyReport(report) {
+    const fallback = () => downloadText(`diagnostic-${new Date().toISOString().slice(0, 10)}.md`, report, "text/markdown");
+    if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(report)
+            .then(() => toast("結果をコピーしました。Claude とのチャットに貼り付けてください"))
+            .catch(() => {
+                fallback();
+                toast("コピーできなかったので、ファイルとして保存しました");
+            });
+    } else {
+        fallback();
+        toast("結果をファイルとして保存しました");
+    }
+}
+
 /** タブキーでスペースを入れられるテキストエリア（コード入力用） */
 export function codeArea(value, attrs = {}) {
     const area = h("textarea", { class: "code-input", spellcheck: "false", autocapitalize: "off", autocomplete: "off", ...attrs });

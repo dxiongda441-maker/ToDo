@@ -2,6 +2,9 @@
 //   - 期限あり（例: FE 合格）: 開始日〜試験日を「段階ごとの学習 70% → 弱点補強 20% → 模試 10%」に割り当てる
 //   - 目標あり・期限なし     : カリキュラムの段階を順にクリアしていく（段階の全トピックが理解度 60 以上で次へ）
 //   - 目標なし（探索）       : 全トピックを満遍なく触って基礎を作る。目標はあとから設定できる
+//
+// lockStages の科目（Python）は、前の段階をクリアするまで次の段階の問題を出さない
+// （基礎 → 読む → 選ぶ → 書く → eval の順に進むため）。計画画面から手動で先に進めることもできる。
 
 import { addDays, clamp, daysBetween, fromDateKey, toDateKey } from "./util.js";
 
@@ -26,6 +29,24 @@ export function stageProgress(save, stage) {
     const avg = values.reduce((a, b) => a + b, 0) / (values.length || 1);
     const cleared = values.every(v => v >= STAGE_CLEAR_ABILITY);
     return { average: avg, cleared };
+}
+
+/** 出題してよい段階の数（lockStages でない科目は全段階） */
+export function unlockedStageCount(save, subject) {
+    const total = subject.stages.length;
+    if (!subject.lockStages) return total;
+    let count = 1;
+    while (count < total && stageProgress(save, subject.stages[count - 1]).cleared) {
+        count += 1;
+    }
+    const manual = save.subjects[subject.id]?.unlockedStages ?? 1;
+    return clamp(Math.max(count, manual), 1, total);
+}
+
+/** 出題してよいトピック ID の Set */
+export function unlockedTopicIds(save, subject) {
+    const count = unlockedStageCount(save, subject);
+    return new Set(subject.stages.slice(0, count).flatMap(stage => stage.topics));
 }
 
 /** 期限ありの計画: 段階ごとの期間（日付キー）を返す */
@@ -74,7 +95,9 @@ export function buildDeadlineSchedule(subject, goal) {
 }
 
 function weakestTopics(save, subject, count) {
+    const allowed = unlockedTopicIds(save, subject);
     return subject.topics
+        .filter(topic => allowed.has(topic.id))
         .map(topic => ({ id: topic.id, ability: topicAbility(save, topic.id) ?? -1, weight: topic.weight }))
         .sort((a, b) => a.ability - b.ability || b.weight - a.weight)
         .slice(0, count)
@@ -106,7 +129,7 @@ export function todayPlan(save, subject, now = Date.now()) {
             || (today < phases[0].start ? phases[0] : phases[phases.length - 1]);
         let focusTopics;
         if (phase.kind === "stage") {
-            focusTopics = [...new Set([...phase.topics, ...weakestTopics(save, subject, 1)])];
+            focusTopics = [...new Set([...phase.topics, ...weakestTopics(save, subject, 2)])];
         } else if (phase.kind === "review") {
             focusTopics = weakestTopics(save, subject, 3);
         } else {
@@ -124,7 +147,9 @@ export function todayPlan(save, subject, now = Date.now()) {
     }
 
     if (mode === "milestone") {
-        const stage = subject.stages.find(s => !stageProgress(save, s).cleared) || subject.stages[subject.stages.length - 1];
+        const stage = subject.lockStages
+            ? subject.stages[unlockedStageCount(save, subject) - 1]
+            : subject.stages.find(s => !stageProgress(save, s).cleared) || subject.stages[subject.stages.length - 1];
         const focusTopics = [...new Set([...stage.topics, ...weakestTopics(save, subject, 1)])];
         return {
             mode,

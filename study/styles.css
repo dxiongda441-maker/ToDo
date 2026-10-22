@@ -318,6 +318,11 @@ input:disabled { background: var(--surface-2); color: var(--muted); }
 .metric__sub { font-size: 0.75rem; color: var(--muted); }
 
 .today { margin-top: 12px; }
+.diagnostic-line { margin: 12px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--info-bg); font-size: 0.88rem; }
+.hero__help { margin-left: 8px; font-weight: 600; }
+.welcome { border-left: 4px solid var(--accent); }
+.steps { margin: 0; padding-left: 1.4em; }
+.steps li { margin: 4px 0; }
 .today__row { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
 
 /* ── 学習 ── */
@@ -368,7 +373,19 @@ input:disabled { background: var(--surface-2); color: var(--muted); }
     font-weight: 700;
     font-size: 0.85rem;
 }
-.choices--result li { padding: 8px 12px; border-radius: 10px; background: var(--surface-2); }
+.choices--result li { display: flex; gap: 4px; padding: 8px 12px; border-radius: 10px; background: var(--surface-2); }
+.choice__text { min-width: 0; overflow-wrap: anywhere; }
+.choice__text.is-code { font-family: var(--mono); font-size: 0.88rem; white-space: pre-wrap; line-height: 1.55; }
+
+.chip--history.is-ok { background: var(--ok-bg); color: var(--ok); }
+.chip--history.is-ng { background: var(--ng-bg); color: var(--ng); }
+.history-note { margin: -4px 0 12px; font-size: 0.92rem; }
+
+.verdict-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+.verdict-chip--strong { background: var(--ok-bg); color: var(--ok); }
+.verdict-chip--ok { background: var(--info-bg); color: var(--accent); }
+.verdict-chip--review { background: var(--warn-bg); color: var(--warn); }
+.verdict-chip--weak { background: var(--ng-bg); color: var(--ng); }
 
 .is-ok { color: var(--ok); }
 .is-ng { color: var(--ng); }
@@ -481,6 +498,10 @@ input:disabled { background: var(--surface-2); color: var(--muted); }
 .timeline__item.is-current::before { background: var(--accent); border-color: var(--accent); }
 .timeline__item.is-cleared::before { background: var(--ok); border-color: var(--ok); }
 .timeline__head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.timeline__item.is-locked { opacity: 0.6; }
+.timeline__item.is-locked .btn { opacity: 1; }
+.diag-list { list-style: none; padding: 0; margin: 0; }
+.diag-list li { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.92rem; }
 
 .topic-rows { list-style: none; padding: 0; margin: 8px 0 0; }
 .topic-row {

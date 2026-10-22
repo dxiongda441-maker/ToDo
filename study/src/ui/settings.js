@@ -135,6 +135,7 @@ function dangerSection(app) {
 export function renderSettings(app, root) {
     append(root, [
         h("h1", { class: "page-title" }, "設定"),
+        h("p", { class: "lead" }, h("a", { href: "#/help" }, "使い方を見る")),
         aiSection(app),
         subjectSection(app),
         backupSection(app),

@@ -17,6 +17,9 @@ export function bank(subjectId) {
         /** 選択式: answer は choices の 0 始まりの番号 */
         choice: (id, topic, difficulty, prompt, choices, answer, explanation, code) =>
             base("choice", id, topic, difficulty, prompt, { choices, answer, explanation, code }),
+        /** 選択式で、選択肢がコードのもの（等幅フォントで表示する） */
+        codeChoice: (id, topic, difficulty, prompt, choices, answer, explanation, code) =>
+            base("choice", id, topic, difficulty, prompt, { choices, answer, explanation, code, codeChoices: true }),
         /** 穴埋め: prompt 中の {0} {1} … が空欄。blanks[i] は許容する答えの一覧 */
         cloze: (id, topic, difficulty, prompt, blanks, explanation) =>
             base("cloze", id, topic, difficulty, prompt, { blanks, explanation }),

@@ -1,24 +1,31 @@
 // 学習画面: 設定 → 出題 → 採点・解説 → 結果。
 //
 // モード
-//   練習     : 1 問ごとに採点と解説を表示
-//   実力テスト: 選択・穴埋めのみ。最後にまとめて結果を表示し、得点を記録
-//   復習のみ : 復習期限が来た問題だけ
+//   練習       : 1 問ごとに採点と解説を表示
+//   診断テスト : 全分野から同じ数ずつ出題して分野別の実力を測る（src/diagnostic.js）
+//   実力テスト : 選択・穴埋めのみ。最後にまとめて結果を表示し、得点を記録
+//   復習のみ   : 復習期限が来た問題だけ
 
 import { aiEnabled, gradeFreeAnswer, generateQuestion } from "../ai.js";
 import { gradeChoice, gradeCloze, gradeCode, keywordCoverage, SELF_GRADES, splitClozePrompt } from "../grader.js";
 import { TYPE_LABELS, abilityLabel } from "../mastery.js";
-import { todayPlan } from "../planner.js";
-import { recordAttempt, recordTest } from "../progress.js";
+import {
+    createDiagnostic, diagnosticLength, diagnosticReport, diagnosticResult,
+    isDiagnosticDone, nextDiagnosticQuestion, recordDiagnosticAnswer
+} from "../diagnostic.js";
+import { todayPlan, unlockedTopicIds } from "../planner.js";
+import { questionHistory, recentMistakes, recordAttempt, recordTest } from "../progress.js";
 import { aiRequestFor, pickNext } from "../selector.js";
 import { isDue } from "../srs.js";
 import { runPython } from "../python/runner.js";
 import { topicName } from "../content/index.js";
-import { generateId, shuffle } from "../util.js";
-import { append, codeArea, h, percent, stars, toast } from "./dom.js";
+import { generateId, shuffle, toDateKey } from "../util.js";
+import { append, codeArea, copyReport, formatDate, formatDateTime, h, percent, stars, toast } from "./dom.js";
 
 const REASON_LABELS = { review: "復習", new: "新しい問題", weak: "苦手の再挑戦", ai: "AI が作成" };
-const MODE_LABELS = { practice: "練習", test: "実力テスト", review: "復習のみ" };
+const MODE_LABELS = { practice: "練習", diagnostic: "診断テスト", test: "実力テスト", review: "復習のみ" };
+/** 1 問ずつ解説を出さず、最後にまとめて答え合わせするモード */
+const isExamMode = mode => mode === "test" || mode === "diagnostic";
 
 let session = null;
 let lastSetup = {};
@@ -40,6 +47,11 @@ function renderSetup(app, root, params) {
     const plan = todayPlan(app.save, subject);
     const useAi = aiEnabled(app.settings);
     const dueCount = app.questionsFor(subjectId).filter(q => isDue(app.save.items[q.id])).length;
+    const perTopic = subject.diagnostic?.perTopic ?? 3;
+    const diagnosticTotal = unlockedTopicIds(app.save, subject).size * perTopic;
+    const initialMode = params.mode && MODE_LABELS[params.mode]
+        ? params.mode
+        : params.review === "1" && dueCount > 0 ? "review" : (lastSetup.mode && lastSetup.mode !== "review" ? lastSetup.mode : "practice");
 
     const select = (name, options, value) => h("select", { name, id: `setup-${name}` },
         options.map(([v, label, disabled]) => h("option", { value: v, selected: v === value, disabled: Boolean(disabled) }, label)));
@@ -54,8 +66,8 @@ function renderSetup(app, root, params) {
             subjectId: data.get("subject"),
             mode: data.get("mode"),
             typeFilter: data.get("type") || "auto",
-            source: data.get("source"),
-            length: Number(data.get("length"))
+            source: data.get("source") || "bank",
+            length: Number(data.get("length") || 10)
         });
     } },
         h("div", { class: "field" },
@@ -66,9 +78,11 @@ function renderSetup(app, root, params) {
             h("label", { for: "setup-mode" }, "モード"),
             select("mode", [
                 ["practice", "練習（1 問ずつ解説）"],
+                ["diagnostic", `診断テスト（全分野から各 ${perTopic} 問・約 ${diagnosticTotal} 問）`],
                 ["test", "実力テスト（選択・穴埋め、最後に採点）"],
                 ["review", `復習のみ（${dueCount} 問）`, dueCount === 0]
-            ], params.review === "1" && dueCount > 0 ? "review" : (lastSetup.mode && lastSetup.mode !== "review" ? lastSetup.mode : "practice"))),
+            ], initialMode),
+            h("p", { class: "hint", id: "setup-mode-hint" })),
         h("div", { class: "field" },
             h("label", { for: "setup-type" }, "問題形式"),
             select("type", types, lastSetup.typeFilter && types.some(t => t[0] === lastSetup.typeFilter) ? lastSetup.typeFilter : "auto")),
@@ -85,10 +99,25 @@ function renderSetup(app, root, params) {
             select("length", [["5", "5 問"], ["10", "10 問"], ["20", "20 問"]], String(lastSetup.length || 10))),
         h("button", { class: "btn btn--primary btn--block", type: "submit" }, "はじめる"));
 
-    // 実力テストは自動採点できる選択・穴埋めだけで行うので、形式の指定は使わない
+    // 診断テスト・実力テストは自動採点できる選択・穴埋めだけで行うので、形式の指定は使わない
     const modeSelect = form.querySelector("#setup-mode");
     const typeSelect = form.querySelector("#setup-type");
-    const syncType = () => { typeSelect.disabled = modeSelect.value === "test"; };
+    const lengthSelect = form.querySelector("#setup-length");
+    const sourceSelect = form.querySelector("#setup-source");
+    const modeHint = form.querySelector("#setup-mode-hint");
+    const MODE_HINTS = {
+        practice: "1 問ごとに正解と解説が出ます。理解度に合わせて難易度と形式が変わります。",
+        diagnostic: "全分野から同じ数ずつ出題し、今の実力を分野別に測ります。途中で解説は出ず、最後にまとめて答え合わせします。結果は保存され、その後の出題に反映されます。",
+        test: "最後にまとめて採点し、点数を記録します。",
+        review: "前に解いて、復習の時期が来た問題だけを出します。"
+    };
+    const syncType = () => {
+        const mode = modeSelect.value;
+        typeSelect.disabled = isExamMode(mode);
+        lengthSelect.disabled = mode === "diagnostic";
+        sourceSelect.disabled = mode === "diagnostic";
+        modeHint.textContent = MODE_HINTS[mode];
+    };
     modeSelect.addEventListener("change", syncType);
     syncType();
 
@@ -110,10 +139,18 @@ function renderSetup(app, root, params) {
 function startSession(app, options) {
     lastSetup = options;
     const subject = app.getSubject(options.subjectId);
+    const diagnostic = options.mode === "diagnostic"
+        ? createDiagnostic(subject, {
+            perTopic: subject.diagnostic?.perTopic ?? 3,
+            topicIds: unlockedTopicIds(app.save, subject)
+        })
+        : null;
     session = {
         id: generateId("s"),
         ...options,
-        typeFilter: options.mode === "test" ? ["choice", "cloze"] : options.typeFilter,
+        length: diagnostic ? diagnosticLength(diagnostic) : options.length,
+        diagnostic,
+        typeFilter: isExamMode(options.mode) ? ["choice", "cloze"] : options.typeFilter,
         asked: new Set(),
         results: [],
         current: null,
@@ -132,15 +169,22 @@ function startSession(app, options) {
 async function obtainQuestion(app) {
     const subject = subjectOf(app);
     const plan = todayPlan(app.save, subject);
-    const focusTopics = session.mode === "test" ? [] : plan.focusTopics;
+    const focusTopics = session.focusTopics || (session.mode === "test" ? [] : plan.focusTopics);
+    // Python のように段階がロックされている科目は、まだ進んでいない段階の新しい問題を出さない
+    const allowedTopics = unlockedTopicIds(app.save, subject);
     let questions = app.questionsFor(subject.id);
     if (session.mode === "review") {
         questions = questions.filter(q => isDue(app.save.items[q.id]));
     }
 
+    if (session.mode === "diagnostic") {
+        const question = nextDiagnosticQuestion(session.diagnostic, { save: app.save, questions, exclude: session.asked });
+        return question ? { question, reason: app.save.items[question.id]?.lastAt ? "weak" : "new" } : null;
+    }
+
     if (session.source !== "ai") {
         const pick = pickNext({
-            save: app.save, subject, questions, focusTopics,
+            save: app.save, subject, questions, focusTopics, allowedTopics,
             typeFilter: session.typeFilter, exclude: session.asked
         });
         if (pick) return { question: pick.question, reason: pick.reason };
@@ -150,12 +194,19 @@ async function obtainQuestion(app) {
         return null;
     }
 
-    const request = aiRequestFor(app.save, subject, focusTopics, session.typeFilter);
+    const aiTopics = (focusTopics.length ? focusTopics : subject.topics.map(t => t.id)).filter(id => allowedTopics.has(id));
+    const request = aiRequestFor(app.save, subject, aiTopics, session.typeFilter);
     const topic = subject.topics.find(t => t.id === request.topicId);
+    // これまでの結果（理解度と、最近間違えた問題）を AI に伝えて、弱点を補う問題を作ってもらう
+    const byId = new Map(app.questionsFor(subject.id).map(q => [q.id, q]));
+    const learner = {
+        ability: app.save.topics[topic.id]?.attempts ? app.save.topics[topic.id].ability : null,
+        mistakes: recentMistakes(app.save, topic.id).map(id => byId.get(id)?.prompt).filter(Boolean)
+    };
     let question = null;
     for (let attempt = 0; attempt < 2 && !question; attempt += 1) {
         const candidate = await generateQuestion(app.settings, {
-            subject, topic, type: request.type, difficulty: request.difficulty, recentPrompts: session.recentPrompts
+            subject, topic, type: request.type, difficulty: request.difficulty, recentPrompts: session.recentPrompts, learner
         });
         if (candidate.type === "code") {
             // AI の模範解答が自分のテストに通らない問題は採用しない
@@ -179,7 +230,7 @@ function finish(app, stage = "summary") {
 }
 
 async function advance(app) {
-    if (session.results.length >= session.length) {
+    if (session.results.length >= session.length || (session.diagnostic && isDiagnosticDone(session.diagnostic))) {
         finish(app);
         return;
     }
@@ -191,6 +242,8 @@ async function advance(app) {
             finish(app, session.results.length > 0 ? "summary" : "empty");
             return;
         }
+        // 解く前の時点での、この問題のこれまでの結果
+        next.history = questionHistory(app.save, next.question.id);
         session.current = next;
         session.asked.add(next.question.id);
         session.recentPrompts.push(next.question.prompt);
@@ -213,8 +266,9 @@ function submit(app, score, details) {
     const question = session.current.question;
     const change = recordAttempt(app.save, subject, question, score, { mode: session.mode, sessionId: session.id });
     session.results.push({ question, score, details, ...change });
+    if (session.diagnostic) recordDiagnosticAnswer(session.diagnostic, question, score);
     app.commit();
-    if (session.mode === "test") {
+    if (isExamMode(session.mode)) {
         advance(app);
     } else {
         session.stage = "feedback";
@@ -224,12 +278,22 @@ function submit(app, score, details) {
 
 // ── 問題の表示 ──
 
-function questionHeader(question, reason) {
+function questionHeader(question, reason, history = null) {
     return h("div", { class: "q-meta" },
         h("span", { class: "chip" }, topicName(question.topic)),
         h("span", { class: "chip chip--type" }, TYPE_LABELS[question.type]),
         h("span", { class: "chip chip--stars", title: `難易度 ${question.difficulty}` }, stars(question.difficulty)),
-        h("span", { class: `chip chip--${reason}` }, REASON_LABELS[reason]));
+        h("span", { class: `chip chip--${reason}` }, REASON_LABELS[reason]),
+        history ? historyChip(history) : null);
+}
+
+/** これまでの結果（前回の正誤・回数）。同じ問題を次に解くときの参考 */
+function historyChip(history) {
+    const lastOk = history.lastScore >= 0.99;
+    return h("span", {
+        class: `chip chip--history ${lastOk ? "is-ok" : "is-ng"}`,
+        title: `これまで ${history.count} 回中 ${history.correct} 回正解`
+    }, `前回${lastOk ? "○" : "×"} ${formatDateTime(history.lastAt).split(" ")[0]}・${history.correct}/${history.count} 正解`);
 }
 
 function promptBlock(question) {
@@ -245,7 +309,14 @@ function renderChoice(app, question) {
             class: "choice",
             type: "button",
             onclick: () => submit(app, gradeChoice(question, index).score, { kind: "choice", selected: index })
-        }, h("span", { class: "choice__key" }, "ABCD"[position] ?? String(position + 1)), question.choices[index])));
+        }, h("span", { class: "choice__key" }, "ABCD"[position] ?? String(position + 1)), choiceText(question, index))));
+}
+
+/** 選択肢の文字。コードの選択肢は改行と字下げを保って等幅で表示する */
+function choiceText(question, index) {
+    const text = question.choices[index];
+    const isCode = question.codeChoices || text.includes("\n");
+    return h("span", { class: `choice__text ${isCode ? "is-code" : ""}` }, text);
 }
 
 function renderCloze(app, question) {
@@ -382,7 +453,7 @@ function progressBar() {
 }
 
 function renderQuestion(app, root) {
-    const { question, reason } = session.current;
+    const { question, reason, history } = session.current;
     const body = {
         choice: renderChoice,
         cloze: renderCloze,
@@ -391,7 +462,7 @@ function renderQuestion(app, root) {
     }[question.type](app, question);
 
     append(root, [progressBar(),
-        h("article", { class: "card question" }, questionHeader(question, reason), promptBlock(question), body),
+        h("article", { class: "card question" }, questionHeader(question, reason, history), promptBlock(question), body),
         h("div", { class: "actions actions--end" },
             h("button", { class: "btn btn--ghost", type: "button", onclick: () => finish(app) }, "ここで終了"))]);
 }
@@ -402,7 +473,7 @@ function correctAnswerView(question, details) {
     if (question.type === "choice") {
         return h("ul", { class: "choices choices--result" }, question.choices.map((choice, index) =>
             h("li", { class: index === question.answer ? "is-ok" : index === details?.selected ? "is-ng" : "" },
-                index === question.answer ? "✔ " : index === details?.selected ? "✘ " : "　", choice)));
+                index === question.answer ? "✔ " : index === details?.selected ? "✘ " : "　", choiceText(question, index))));
     }
     if (question.type === "cloze") {
         return h("ul", { class: "blank-list" }, question.blanks.map((accepted, i) =>
@@ -430,6 +501,17 @@ function aiGradeView(grade) {
         grade.betterAnswer ? h("div", { class: "answer-box" }, h("strong", {}, "より良い解答例"), h("p", { class: "pre" }, grade.betterAnswer)) : null);
 }
 
+/** 前回の結果と比べた一言 */
+function historyNote(history, score) {
+    if (!history) return null;
+    const lastOk = history.lastScore >= 0.99;
+    const nowOk = score >= 0.99;
+    if (!lastOk && nowOk) return h("p", { class: "history-note up" }, "前回は間違えた問題です。克服しました！");
+    if (lastOk && !nowOk) return h("p", { class: "history-note down" }, "前回は正解していた問題です。忘れかけているので、近いうちにもう一度出題します。");
+    if (!lastOk && !nowOk) return h("p", { class: "history-note down" }, `この問題は ${history.count + 1} 回中 ${history.correct} 回正解です。解説をじっくり読んでおきましょう。`);
+    return h("p", { class: "history-note muted" }, `${history.count + 1} 回目の挑戦です。しっかり定着しています。`);
+}
+
 function abilityChange(result) {
     const before = result.abilityBefore;
     const after = result.abilityAfter;
@@ -454,10 +536,11 @@ function renderFeedback(app, root) {
 
     append(root, [progressBar(),
         h("article", { class: "card question" },
-            questionHeader(question, session.current.reason),
+            questionHeader(question, session.current.reason, session.current.history),
             promptBlock(question),
             question.type === "cloze" ? h("p", { class: "q-prompt" }, question.prompt.replace(/\{(\d+)\}/g, (_, n) => `（${Number(n) + 1}）`)) : null,
             h("div", { class: `verdict ${score >= 0.99 ? "verdict--ok" : score > 0 ? "verdict--partial" : "verdict--ng"}` }, verdict),
+            historyNote(session.current.history, score),
             aiGradeView(details?.aiGrade),
             correctAnswerView(question, details),
             question.explanation ? h("div", { class: "explanation" }, h("strong", {}, "解説"), h("p", {}, question.explanation)) : null,
@@ -473,16 +556,51 @@ function renderFeedback(app, root) {
 
 // ── 結果 ──
 
+function diagnosticView(app, subject, diagnostic) {
+    const weakNames = diagnostic.weak.map(topicName);
+    return h("section", { class: "card" },
+        h("h2", { class: "section-title" }, "分野別の診断結果"),
+        h("div", { class: "table-wrap" }, h("table", { class: "table" },
+            h("thead", {}, h("tr", {}, ["分野", "正解", "正解できた最高難易度", "判定"].map(t => h("th", { scope: "col" }, t)))),
+            h("tbody", {}, diagnostic.topics.map(t => h("tr", {},
+                h("th", { scope: "row" }, t.name),
+                h("td", {}, `${t.correct} / ${t.total}`),
+                h("td", {}, t.maxCorrect ? stars(t.maxCorrect) : "—"),
+                h("td", {}, h("span", { class: `verdict-chip verdict-chip--${t.verdict.key}` }, t.verdict.label))))))),
+        h("p", {}, weakNames.length
+            ? `重点的に練習したい分野: ${weakNames.join("・")}。この結果は保存され、これからの練習ではこれらの分野から多めに出題します。`
+            : "すべての分野でおおむね理解できています。練習では少し難しい問題から出題します。"),
+        h("div", { class: "actions" },
+            weakNames.length
+                ? h("button", { class: "btn btn--primary", type: "button", onclick: () => startSession(app, {
+                    subjectId: subject.id, mode: "practice", typeFilter: "auto", source: "mixed", length: 10, focusTopics: diagnostic.weak
+                }) }, "苦手な分野を練習する")
+                : null,
+            h("button", { class: "btn", type: "button", onclick: () => copyReport(session.report) }, "結果をコピー（Claude に送る用）")),
+        h("p", { class: "hint" }, "「結果をコピー」した内容を Claude とのチャットに貼り付けると、苦手な分野に合わせた問題を問題集に追加してもらえます。"));
+}
+
 function renderSummary(app, root) {
     const subject = subjectOf(app);
     const results = session.results;
     const total = results.length;
     const scoreSum = results.reduce((sum, r) => sum + r.score, 0);
 
-    if (session.mode === "test" && !session.recorded && total > 0) {
-        recordTest(app.save, subject, { score: scoreSum, total });
+    const diagnostic = session.diagnostic ? diagnosticResult(session.diagnostic, subject) : null;
+    if (isExamMode(session.mode) && !session.recorded && total > 0) {
+        const report = diagnostic ? diagnosticReport(subject, diagnostic, results, formatDate(toDateKey(Date.now()))) : null;
+        recordTest(app.save, subject, {
+            kind: session.mode,
+            score: scoreSum,
+            total,
+            topics: diagnostic?.topics.map(t => ({
+                topicId: t.topicId, correct: t.correct, total: t.total, rate: t.rate, maxCorrect: t.maxCorrect, verdict: t.verdict.key
+            })),
+            report
+        });
         app.commit();
         session.recorded = true;
+        session.report = report;
     }
 
     const touched = [...new Set(results.map(r => r.question.topic))];
@@ -503,7 +621,8 @@ function renderSummary(app, root) {
                         ` ${abilityLabel(after)}`,
                         before === null ? null : h("span", { class: diff >= 0 ? "up" : "down" }, ` (${diff >= 0 ? "+" : ""}${diff.toFixed(1)})`)));
             }))),
-        session.mode === "test"
+        diagnostic ? diagnosticView(app, subject, diagnostic) : null,
+        isExamMode(session.mode)
             ? h("section", { class: "card" },
                 h("h2", { class: "section-title" }, "答え合わせ"),
                 results.map((r, i) => h("details", { class: "review-item" },
