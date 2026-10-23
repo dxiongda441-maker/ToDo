@@ -1,46 +1,72 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ToDo App</title>
+    <title>ToDo</title>
+    <meta name="theme-color" content="#1e40af">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="ToDo">
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <main class="app">
-        <h1>ToDo List</h1>
+        <h1>ToDo</h1>
         <form id="todo-form" class="todo-form" autocomplete="off">
-            <label class="visually-hidden" for="task-input">Task</label>
-            <input id="task-input" name="task" type="text" placeholder="Add a new task" required>
-            <button type="submit">Add</button>
+            <label class="visually-hidden" for="task-input">タスク</label>
+            <input id="task-input" name="task" type="text" placeholder="新しいタスクを入力" required>
+            <button type="submit">追加</button>
+            <div class="form-options">
+                <label class="due-field">
+                    <span>期限</span>
+                    <input id="due-input" name="due" type="date">
+                </label>
+                <label class="important-field">
+                    <input id="important-input" name="important" type="checkbox">
+                    <span>★ 重要</span>
+                </label>
+            </div>
         </form>
 
-        <section class="controls" aria-label="Task controls">
-            <div class="filters" role="group" aria-label="Filters">
-                <button type="button" class="filter-button active" data-filter="all">All</button>
-                <button type="button" class="filter-button" data-filter="active">Active</button>
-                <button type="button" class="filter-button" data-filter="completed">Completed</button>
+        <section class="controls" aria-label="タスクの操作">
+            <div class="filters" role="group" aria-label="絞り込み">
+                <button type="button" class="filter-button active" data-filter="all">すべて</button>
+                <button type="button" class="filter-button" data-filter="active">未完了</button>
+                <button type="button" class="filter-button" data-filter="completed">完了</button>
             </div>
-            <button type="button" id="clear-completed" class="clear-button">Clear completed</button>
+            <button type="button" id="clear-completed" class="clear-button">完了済みを削除</button>
         </section>
 
-        <section aria-label="Task list" class="task-section">
+        <section aria-label="タスク一覧" class="task-section">
             <ul id="task-list" class="task-list" aria-live="polite"></ul>
-            <p id="empty-state" class="empty-state" hidden>No tasks yet. Add your first one above!</p>
+            <p id="empty-state" class="empty-state" hidden>タスクはまだありません。上の入力欄から追加しましょう。</p>
         </section>
 
         <footer class="summary" aria-live="polite">
-            <span id="task-count">0 tasks</span>
-            <span id="completed-count">0 completed tasks</span>
+            <span id="task-count">タスク 0件</span>
+            <span id="completed-count">完了 0件</span>
+            <span id="overdue-count" class="overdue-count" hidden></span>
         </footer>
 
-        <section class="history-section" aria-label="Task history">
+        <section class="backup-section" aria-label="バックアップ">
+            <div class="backup-actions">
+                <button type="button" id="export-button" class="backup-button">バックアップを書き出す</button>
+                <button type="button" id="import-button" class="backup-button">バックアップから復元</button>
+                <input type="file" id="import-input" accept="application/json,.json" hidden>
+            </div>
+            <p id="backup-status" class="backup-status" aria-live="polite"></p>
+        </section>
+
+        <section class="history-section" aria-label="履歴">
             <header class="history-header">
-                <h2>Task History</h2>
+                <h2>履歴</h2>
                 <div class="month-nav">
-                    <button type="button" id="prev-month" class="month-button" aria-label="View previous month">Prev</button>
+                    <button type="button" id="prev-month" class="month-button" aria-label="前の月を表示">‹ 前月</button>
                     <span id="month-label" class="month-label"></span>
-                    <button type="button" id="next-month" class="month-button" aria-label="View next month">Next</button>
+                    <button type="button" id="next-month" class="month-button" aria-label="次の月を表示">翌月 ›</button>
                 </div>
             </header>
             <div class="calendar-wrapper">
@@ -49,7 +75,7 @@
             <div class="history-list">
                 <h3 id="history-date-label" class="history-date-label"></h3>
                 <ul id="history-items" class="history-items"></ul>
-                <p id="history-empty" class="history-empty" hidden>No activity logged for this day.</p>
+                <p id="history-empty" class="history-empty" hidden>この日の記録はありません。</p>
             </div>
         </section>
     </main>
@@ -60,13 +86,35 @@
                 <input type="checkbox" class="task-toggle">
                 <span class="task-body">
                     <span class="task-text"></span>
-                    <time class="task-meta" datetime=""></time>
+                    <span class="task-info">
+                        <span class="task-due" hidden></span>
+                        <time class="task-meta" datetime=""></time>
+                    </span>
                 </span>
             </label>
             <div class="task-actions">
-                <button type="button" class="edit-button" title="Edit task">Edit</button>
-                <button type="button" class="delete-button" title="Delete task">Delete</button>
+                <button type="button" class="important-button" title="重要マークを切り替え" aria-pressed="false">☆</button>
+                <button type="button" class="edit-button" title="タスクを編集">編集</button>
+                <button type="button" class="delete-button" title="タスクを削除">削除</button>
             </div>
+        </li>
+    </template>
+
+    <template id="task-edit-template">
+        <li class="task-item task-item--editing">
+            <form class="task-edit-form">
+                <input type="text" class="edit-text" aria-label="タスク名" required>
+                <div class="task-edit-row">
+                    <label class="due-field">
+                        <span>期限</span>
+                        <input type="date" class="edit-due">
+                    </label>
+                    <div class="task-edit-buttons">
+                        <button type="submit" class="save-button">保存</button>
+                        <button type="button" class="cancel-button">キャンセル</button>
+                    </div>
+                </div>
+            </form>
         </li>
     </template>
 

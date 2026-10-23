@@ -1,8 +1,24 @@
 (() => {
     const STORAGE_KEY = "todo.tasks.v1";
     const ARCHIVE_STORAGE_KEY = "todo.archive.v1";
+    const BACKUP_STORAGE_KEY = "todo.lastBackupAt.v1";
+    const BACKUP_REMINDER_DAYS = 7;
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const LOCALE = "ja-JP";
+    const STATUS_LABELS = {
+        "Active": "未完了",
+        "Completed": "完了",
+        "Completed (archived)": "完了（削除済み）",
+        "Completed then deleted": "完了後に削除",
+        "Cleared": "完了済みを削除",
+        "Deleted": "削除"
+    };
     const form = document.querySelector("#todo-form");
     const input = document.querySelector("#task-input");
+    const dueInput = document.querySelector("#due-input");
+    const importantInput = document.querySelector("#important-input");
+    const editTemplate = document.querySelector("#task-edit-template");
+    const overdueCountEl = document.querySelector("#overdue-count");
     const list = document.querySelector("#task-list");
     const template = document.querySelector("#task-template");
     const taskCountEl = document.querySelector("#task-count");
@@ -17,6 +33,10 @@
     const historyDateLabel = document.querySelector("#history-date-label");
     const historyItems = document.querySelector("#history-items");
     const historyEmpty = document.querySelector("#history-empty");
+    const exportButton = document.querySelector("#export-button");
+    const importButton = document.querySelector("#import-button");
+    const importInput = document.querySelector("#import-input");
+    const backupStatusEl = document.querySelector("#backup-status");
     const historyEnabled = Boolean(
         calendarGrid &&
         monthLabelEl &&
@@ -33,7 +53,7 @@
         let fullDate = null;
         let weekday = null;
         try {
-            dateTime = new Intl.DateTimeFormat(undefined, {
+            dateTime = new Intl.DateTimeFormat(LOCALE, {
                 dateStyle: "medium",
                 timeStyle: "short"
             });
@@ -41,7 +61,7 @@
             dateTime = null;
         }
         try {
-            month = new Intl.DateTimeFormat(undefined, {
+            month = new Intl.DateTimeFormat(LOCALE, {
                 month: "long",
                 year: "numeric"
             });
@@ -49,14 +69,14 @@
             month = null;
         }
         try {
-            fullDate = new Intl.DateTimeFormat(undefined, {
+            fullDate = new Intl.DateTimeFormat(LOCALE, {
                 dateStyle: "full"
             });
         } catch (_error) {
             fullDate = null;
         }
         try {
-            weekday = new Intl.DateTimeFormat(undefined, {
+            weekday = new Intl.DateTimeFormat(LOCALE, {
                 weekday: "short"
             });
         } catch (_error) {
@@ -67,7 +87,7 @@
     })();
 
     const weekdayNames = (() => {
-        const fallback = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const fallback = ["日", "月", "火", "水", "木", "金", "土"];
         if (!formatters.weekday) {
             return fallback;
         }
@@ -85,6 +105,9 @@
     let tasks = [];
     let archivedTasks = [];
     let activeFilter = "all";
+    let editingId = null;
+    // Unsaved editor values, kept so re-rendering other tasks does not discard them.
+    let editDraft = null;
     const todayKey = toDateKey(Date.now());
     let selectedDate = todayKey;
     let currentMonth = startOfMonth(new Date());
@@ -134,21 +157,7 @@
             }
         }
 
-        const monthNames = [
-            "January",
-            "February",
-            "March",
-            "April",
-            "May",
-            "June",
-            "July",
-            "August",
-            "September",
-            "October",
-            "November",
-            "December"
-        ];
-        return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+        return `${date.getFullYear()}年${date.getMonth() + 1}月`;
     }
 
     function toDateKey(value) {
@@ -212,53 +221,97 @@
         return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
     }
 
+    function normalizeDueDate(value) {
+        return typeof value === "string" && createDateFromKey(value) ? value : "";
+    }
+
+    function normalizeTask(item, now) {
+        if (!item || typeof item.text !== "string") {
+            return { task: null, migrated: true };
+        }
+
+        const text = item.text.trim();
+        if (!text) {
+            return { task: null, migrated: true };
+        }
+
+        let migrated = false;
+        const createdAt = typeof item.createdAt === "number" ? item.createdAt : now;
+        if (typeof item.createdAt !== "number") {
+            migrated = true;
+        }
+
+        let id = item.id;
+        if (typeof id !== "string" || !id.trim()) {
+            id = generateId();
+            migrated = true;
+        }
+
+        const completed = Boolean(item.completed);
+        // Tasks completed before completion times were tracked keep a null completedAt.
+        const completedAt = completed && typeof item.completedAt === "number" ? item.completedAt : null;
+
+        return {
+            task: {
+                id,
+                text,
+                completed,
+                createdAt,
+                completedAt,
+                dueDate: normalizeDueDate(item.dueDate),
+                important: Boolean(item.important)
+            },
+            migrated
+        };
+    }
+
+    function normalizeArchiveRecord(item, now) {
+        const { task, migrated } = normalizeTask(item, now);
+        if (!task) {
+            return { record: null, migrated };
+        }
+
+        const deletedAt = typeof item.deletedAt === "number" ? item.deletedAt : task.createdAt;
+        const reason = typeof item.reason === "string" ? item.reason : "deleted";
+
+        return {
+            record: { ...task, deletedAt, reason },
+            migrated: migrated || typeof item.deletedAt !== "number"
+        };
+    }
+
+    function normalizeList(list, normalize) {
+        const now = Date.now();
+        let migrated = false;
+        const items = list.map(item => {
+            const result = normalize(item, now);
+            migrated = migrated || result.migrated;
+            return result.task || result.record;
+        }).filter(Boolean);
+
+        return { items, migrated };
+    }
+
+    function readStoredArray(key) {
+        const raw = localStorage.getItem(key);
+        if (!raw) {
+            return null;
+        }
+
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : null;
+    }
+
     function loadTasks() {
         tasks = [];
         try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (!raw) {
+            const parsed = readStoredArray(STORAGE_KEY);
+            if (!parsed) {
                 return;
             }
 
-            const parsed = JSON.parse(raw);
-            if (!Array.isArray(parsed)) {
-                return;
-            }
-
-            let migrated = false;
-            const now = Date.now();
-
-            tasks = parsed.map(item => {
-                if (!item || typeof item.text !== "string") {
-                    migrated = true;
-                    return null;
-                }
-
-                const text = item.text.trim();
-                if (!text) {
-                    migrated = true;
-                    return null;
-                }
-
-                const createdAt = typeof item.createdAt === "number" ? item.createdAt : now;
-                if (typeof item.createdAt !== "number") {
-                    migrated = true;
-                }
-
-                let id = item.id;
-                if (typeof id !== "string" || !id.trim()) {
-                    id = generateId();
-                    migrated = true;
-                }
-
-                return {
-                    id,
-                    text,
-                    completed: Boolean(item.completed),
-                    createdAt
-                };
-            }).filter(Boolean);
-
+            const { items, migrated } = normalizeList(parsed, normalizeTask);
+            tasks = items;
             if (migrated) {
                 saveTasks();
             }
@@ -271,53 +324,13 @@
     function loadArchive() {
         archivedTasks = [];
         try {
-            const raw = localStorage.getItem(ARCHIVE_STORAGE_KEY);
-            if (!raw) {
+            const parsed = readStoredArray(ARCHIVE_STORAGE_KEY);
+            if (!parsed) {
                 return;
             }
 
-            const parsed = JSON.parse(raw);
-            if (!Array.isArray(parsed)) {
-                return;
-            }
-
-            let migrated = false;
-            archivedTasks = parsed.map(item => {
-                if (!item || typeof item.text !== "string") {
-                    migrated = true;
-                    return null;
-                }
-
-                const text = item.text.trim();
-                if (!text) {
-                    migrated = true;
-                    return null;
-                }
-
-                const createdAt = typeof item.createdAt === "number" ? item.createdAt : Date.now();
-                const deletedAt = typeof item.deletedAt === "number" ? item.deletedAt : createdAt;
-                if (typeof item.createdAt !== "number" || typeof item.deletedAt !== "number") {
-                    migrated = true;
-                }
-
-                let id = item.id;
-                if (typeof id !== "string" || !id.trim()) {
-                    id = generateId();
-                    migrated = true;
-                }
-
-                const reason = typeof item.reason === "string" ? item.reason : "deleted";
-
-                return {
-                    id,
-                    text,
-                    createdAt,
-                    deletedAt,
-                    completed: Boolean(item.completed),
-                    reason
-                };
-            }).filter(Boolean);
-
+            const { items, migrated } = normalizeList(parsed, normalizeArchiveRecord);
+            archivedTasks = items;
             if (migrated) {
                 saveArchive();
             }
@@ -343,7 +356,117 @@
         }
     }
 
-    function createTask(text) {
+    function loadLastBackupAt() {
+        try {
+            const value = Number(localStorage.getItem(BACKUP_STORAGE_KEY));
+            return Number.isFinite(value) && value > 0 ? value : null;
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    function updateBackupStatus() {
+        const lastBackupAt = loadLastBackupAt();
+        const hasData = tasks.length > 0 || archivedTasks.length > 0;
+        let text;
+        let overdue = false;
+
+        if (lastBackupAt === null) {
+            text = hasData ? "まだバックアップがありません。一度書き出しておきましょう。" : "バックアップはまだありません。";
+            overdue = hasData;
+        } else {
+            const days = Math.floor((Date.now() - lastBackupAt) / DAY_MS);
+            const when = days === 0 ? "今日" : `${days}日前`;
+            text = `最終バックアップ: ${when}（${formatTimestamp(new Date(lastBackupAt))}）`;
+            overdue = hasData && days >= BACKUP_REMINDER_DAYS;
+        }
+
+        backupStatusEl.textContent = text;
+        backupStatusEl.classList.toggle("backup-status--warning", overdue);
+    }
+
+    function exportData() {
+        const now = new Date();
+        const payload = {
+            app: "todo",
+            version: 1,
+            exportedAt: now.getTime(),
+            tasks,
+            archive: archivedTasks
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `todo-backup-${toDateKey(now)}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+
+        try {
+            localStorage.setItem(BACKUP_STORAGE_KEY, String(now.getTime()));
+        } catch (error) {
+            console.warn("Failed to save backup time", error);
+        }
+        updateBackupStatus();
+    }
+
+    // knownIds spans live tasks and the archive so one task never ends up in both.
+    function mergeById(current, incoming, knownIds) {
+        const added = incoming.filter(item => !knownIds.has(item.id));
+        added.forEach(item => knownIds.add(item.id));
+        return { merged: [...current, ...added], addedCount: added.length };
+    }
+
+    function importData(file) {
+        const reader = new FileReader();
+        reader.addEventListener("load", () => {
+            let payload;
+            try {
+                payload = JSON.parse(String(reader.result));
+            } catch (_error) {
+                window.alert("ファイルを読み込めませんでした。バックアップのJSONファイルを選んでください。");
+                return;
+            }
+
+            // A bare array is accepted as a plain task list.
+            const incomingTasks = Array.isArray(payload) ? payload : payload && payload.tasks;
+            const incomingArchive = payload && Array.isArray(payload.archive) ? payload.archive : [];
+            if (!Array.isArray(incomingTasks)) {
+                window.alert("このファイルにはタスクが含まれていません。");
+                return;
+            }
+
+            const knownIds = new Set([...tasks, ...archivedTasks].map(item => item.id));
+            const nextTasks = mergeById(tasks, normalizeList(incomingTasks, normalizeTask).items, knownIds);
+            const nextArchive = mergeById(archivedTasks, normalizeList(incomingArchive, normalizeArchiveRecord).items, knownIds);
+            if (nextTasks.addedCount === 0 && nextArchive.addedCount === 0) {
+                window.alert("新しく追加されるデータはありませんでした（すべて取り込み済みです）。");
+                return;
+            }
+
+            const confirmed = window.confirm(
+                `タスク ${nextTasks.addedCount} 件、履歴 ${nextArchive.addedCount} 件を追加します。\n` +
+                "今あるデータはそのまま残ります。よろしいですか？"
+            );
+            if (!confirmed) {
+                return;
+            }
+
+            tasks = nextTasks.merged;
+            archivedTasks = nextArchive.merged;
+            saveTasks();
+            saveArchive();
+            renderTasks();
+        });
+        reader.addEventListener("error", () => {
+            window.alert("ファイルを読み込めませんでした。");
+        });
+        reader.readAsText(file);
+    }
+
+    function createTask(text, dueDate, important) {
         const trimmed = text.trim();
         if (!trimmed) {
             return null;
@@ -353,7 +476,10 @@
             id: generateId(),
             text: trimmed,
             completed: false,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            completedAt: null,
+            dueDate: normalizeDueDate(dueDate),
+            important: Boolean(important)
         };
     }
 
@@ -368,6 +494,9 @@
             createdAt: task.createdAt,
             deletedAt: Date.now(),
             completed: Boolean(task.completed),
+            completedAt: task.completedAt || null,
+            dueDate: task.dueDate || "",
+            important: Boolean(task.important),
             reason: reason || "deleted"
         };
 
@@ -386,33 +515,149 @@
         }
     }
 
+    // Open tasks first: important, then nearest due date (none last), then newest.
+    // Completed tasks follow, most recently completed first.
+    function compareTasks(a, b) {
+        if (a.completed !== b.completed) {
+            return a.completed ? 1 : -1;
+        }
+
+        if (a.completed) {
+            return (b.completedAt || 0) - (a.completedAt || 0);
+        }
+
+        if (a.important !== b.important) {
+            return a.important ? -1 : 1;
+        }
+
+        if (a.dueDate !== b.dueDate) {
+            if (!a.dueDate) {
+                return 1;
+            }
+            if (!b.dueDate) {
+                return -1;
+            }
+            return a.dueDate < b.dueDate ? -1 : 1;
+        }
+
+        return b.createdAt - a.createdAt;
+    }
+
+    function isOverdue(task, todayDateKey) {
+        return !task.completed && Boolean(task.dueDate) && task.dueDate < todayDateKey;
+    }
+
+    function describeDue(task, todayDateKey) {
+        const dueDate = createDateFromKey(task.dueDate);
+        if (!dueDate) {
+            return null;
+        }
+
+        const today = createDateFromKey(todayDateKey);
+        const days = Math.round((dueDate - today) / DAY_MS);
+        const weekday = weekdayNames[dueDate.getDay()];
+        const shortDate = `${dueDate.getMonth() + 1}/${dueDate.getDate()}(${weekday})`;
+
+        if (task.completed) {
+            return { text: `期限 ${shortDate}`, state: "done" };
+        }
+        if (days < 0) {
+            return { text: `期限切れ ${shortDate}`, state: "overdue" };
+        }
+        if (days === 0) {
+            return { text: "今日まで", state: "today" };
+        }
+        if (days === 1) {
+            return { text: "明日まで", state: "soon" };
+        }
+        return { text: `${shortDate}まで`, state: days <= 3 ? "soon" : "later" };
+    }
+
+    function renderEditor(task) {
+        const node = document.importNode(editTemplate.content, true);
+        const item = node.querySelector(".task-item");
+        const form = node.querySelector(".task-edit-form");
+        const textInput = node.querySelector(".edit-text");
+        const dueField = node.querySelector(".edit-due");
+        const cancelButton = node.querySelector(".cancel-button");
+
+        item.dataset.id = task.id;
+        textInput.value = editDraft ? editDraft.text : task.text;
+        dueField.value = editDraft ? editDraft.dueDate : task.dueDate;
+
+        form.addEventListener("input", () => {
+            editDraft = { text: textInput.value, dueDate: dueField.value };
+        });
+
+        const cancel = () => {
+            editingId = null;
+            editDraft = null;
+            renderTasks();
+        };
+
+        form.addEventListener("submit", event => {
+            event.preventDefault();
+            saveEdit(task.id, textInput.value, dueField.value);
+        });
+        form.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                cancel();
+            }
+        });
+        cancelButton.addEventListener("click", cancel);
+
+        return node;
+    }
+
     function renderTasks() {
         list.innerHTML = "";
-        const filtered = getFilteredTasks();
+        const filtered = getFilteredTasks().sort(compareTasks);
+        const todayDateKey = toDateKey(Date.now());
 
         emptyStateEl.hidden = filtered.length !== 0;
 
         const fragment = document.createDocumentFragment();
 
         filtered.forEach(task => {
+            if (task.id === editingId) {
+                fragment.appendChild(renderEditor(task));
+                return;
+            }
+
             const node = document.importNode(template.content, true);
             const item = node.querySelector(".task-item");
             const toggle = node.querySelector(".task-toggle");
             const text = node.querySelector(".task-text");
             const meta = node.querySelector(".task-meta");
+            const due = node.querySelector(".task-due");
+            const importantButton = node.querySelector(".important-button");
             const editButton = node.querySelector(".edit-button");
             const deleteButton = node.querySelector(".delete-button");
 
             item.dataset.id = task.id;
             item.classList.toggle("completed", Boolean(task.completed));
+            item.classList.toggle("important", Boolean(task.important));
+            item.classList.toggle("overdue", isOverdue(task, todayDateKey));
             toggle.checked = Boolean(task.completed);
             text.textContent = task.text;
 
+            const dueInfo = describeDue(task, todayDateKey);
+            due.hidden = !dueInfo;
+            if (dueInfo) {
+                due.textContent = dueInfo.text;
+                due.classList.add(`task-due--${dueInfo.state}`);
+            }
+
+            importantButton.textContent = task.important ? "★" : "☆";
+            importantButton.setAttribute("aria-pressed", task.important ? "true" : "false");
+            importantButton.setAttribute("aria-label", task.important ? "重要マークを外す" : "重要にする");
+
             if (meta) {
-                const createdAtDate = new Date(task.createdAt);
-                const stamp = formatTimestamp(createdAtDate);
-                meta.dateTime = createdAtDate.toISOString();
-                meta.textContent = stamp ? `Added ${stamp}` : "";
+                const showCompleted = task.completed && task.completedAt;
+                const metaDate = new Date(showCompleted ? task.completedAt : task.createdAt);
+                const stamp = formatTimestamp(metaDate);
+                meta.dateTime = metaDate.toISOString();
+                meta.textContent = stamp ? `${showCompleted ? "完了" : "追加"}: ${stamp}` : "";
                 meta.hidden = stamp === "";
             }
 
@@ -420,8 +665,12 @@
                 toggleTask(task.id, toggle.checked);
             });
 
+            importantButton.addEventListener("click", () => {
+                toggleImportant(task.id);
+            });
+
             editButton.addEventListener("click", () => {
-                editTask(task.id);
+                startEdit(task.id);
             });
 
             deleteButton.addEventListener("click", () => {
@@ -432,19 +681,28 @@
         });
 
         list.appendChild(fragment);
+
+        const editText = list.querySelector(".edit-text");
+        if (editText && document.activeElement !== editText) {
+            editText.focus();
+        }
+
         updateSummary();
         updateClearButtonState();
+        updateBackupStatus();
         refreshHistoryViews();
     }
 
     function updateSummary() {
         const total = tasks.length;
         const completed = tasks.filter(task => task.completed).length;
-        const totalLabel = total === 1 ? "task" : "tasks";
-        const completedLabel = completed === 1 ? "completed task" : "completed tasks";
+        taskCountEl.textContent = `タスク ${total}件`;
+        completedCountEl.textContent = `完了 ${completed}件`;
 
-        taskCountEl.textContent = `${total} ${totalLabel}`;
-        completedCountEl.textContent = `${completed} ${completedLabel}`;
+        const todayDateKey = toDateKey(Date.now());
+        const overdue = tasks.filter(task => isOverdue(task, todayDateKey)).length;
+        overdueCountEl.hidden = overdue === 0;
+        overdueCountEl.textContent = `期限切れ ${overdue}件`;
     }
 
     function updateClearButtonState() {
@@ -460,28 +718,39 @@
         }
 
         task.completed = Boolean(completed);
+        task.completedAt = task.completed ? Date.now() : null;
         saveTasks();
         renderTasks();
     }
 
-    function editTask(id) {
+    function toggleImportant(id) {
         const task = tasks.find(item => item.id === id);
         if (!task) {
             return;
         }
 
-        const nextText = window.prompt("Edit task", task.text);
-        if (nextText === null) {
-            return;
-        }
+        task.important = !task.important;
+        saveTasks();
+        renderTasks();
+    }
 
-        const trimmed = nextText.trim();
-        if (!trimmed) {
-            deleteTask(id);
+    function startEdit(id) {
+        editingId = id;
+        editDraft = null;
+        renderTasks();
+    }
+
+    function saveEdit(id, text, dueDate) {
+        const task = tasks.find(item => item.id === id);
+        const trimmed = text.trim();
+        if (!task || !trimmed) {
             return;
         }
 
         task.text = trimmed;
+        task.dueDate = normalizeDueDate(dueDate);
+        editingId = null;
+        editDraft = null;
         saveTasks();
         renderTasks();
     }
@@ -513,7 +782,7 @@
     function handleFormSubmit(event) {
         event.preventDefault();
         const value = input.value;
-        const task = createTask(value);
+        const task = createTask(value, dueInput.value, importantInput.checked);
         if (!task) {
             input.focus();
             return;
@@ -521,6 +790,8 @@
 
         tasks.unshift(task);
         input.value = "";
+        dueInput.value = "";
+        importantInput.checked = false;
         input.focus();
         saveTasks();
         renderTasks();
@@ -552,17 +823,19 @@
             if (!dateKey) {
                 return;
             }
-            const record = stats.get(dateKey) || { created: 0, deleted: 0 };
+            const record = stats.get(dateKey) || { created: 0, completed: 0, deleted: 0 };
             record[type] += 1;
             stats.set(dateKey, record);
         };
 
         tasks.forEach(task => {
             increment(toDateKey(task.createdAt), "created");
+            increment(toDateKey(task.completedAt), "completed");
         });
 
         archivedTasks.forEach(task => {
             increment(toDateKey(task.createdAt), "created");
+            increment(toDateKey(task.completedAt), "completed");
             increment(toDateKey(task.deletedAt), "deleted");
         });
 
@@ -599,7 +872,7 @@
             const dateKey = toDateKey(cellDate);
             const isCurrentMonth = cellDate.getMonth() === monthStart.getMonth();
             const stat = stats.get(dateKey);
-            const totalEvents = stat ? stat.created + stat.deleted : 0;
+            const totalEvents = stat ? stat.created + stat.completed + stat.deleted : 0;
 
             const button = document.createElement("button");
             button.type = "button";
@@ -617,10 +890,13 @@
             const labelParts = [formatFullDate(cellDate)];
             if (stat) {
                 if (stat.created > 0) {
-                    labelParts.push(`${stat.created} created`);
+                    labelParts.push(`追加 ${stat.created}件`);
+                }
+                if (stat.completed > 0) {
+                    labelParts.push(`完了 ${stat.completed}件`);
                 }
                 if (stat.deleted > 0) {
-                    labelParts.push(`${stat.deleted} deleted`);
+                    labelParts.push(`削除 ${stat.deleted}件`);
                 }
             }
             button.setAttribute("aria-label", labelParts.join(", "));
@@ -630,10 +906,16 @@
             dayNumber.textContent = String(cellDate.getDate());
             button.appendChild(dayNumber);
 
-            if (totalEvents > 0) {
+            if (stat && stat.completed > 0) {
+                button.classList.add("has-completed");
+                const done = document.createElement("span");
+                done.className = "day-completed";
+                done.textContent = `✓${stat.completed}`;
+                button.appendChild(done);
+            } else if (totalEvents > 0) {
                 const count = document.createElement("span");
                 count.className = "day-events";
-                count.textContent = `${totalEvents} item${totalEvents === 1 ? "" : "s"}`;
+                count.textContent = `${totalEvents}件`;
                 button.appendChild(count);
             }
 
@@ -647,11 +929,24 @@
 
     function getHistoryForDate(dateKey) {
         const created = [];
+        const completed = [];
         const deleted = [];
 
         if (!dateKey) {
-            return { created, deleted };
+            return { created, completed, deleted };
         }
+
+        [...tasks, ...archivedTasks].forEach(task => {
+            if (toDateKey(task.completedAt) === dateKey) {
+                completed.push({
+                    id: task.id,
+                    text: task.text,
+                    createdAt: task.createdAt,
+                    completedAt: task.completedAt,
+                    status: "Completed"
+                });
+            }
+        });
 
         tasks.forEach(task => {
             if (toDateKey(task.createdAt) === dateKey) {
@@ -698,9 +993,10 @@
         });
 
         created.sort((a, b) => b.createdAt - a.createdAt);
+        completed.sort((a, b) => b.completedAt - a.completedAt);
         deleted.sort((a, b) => b.deletedAt - a.deletedAt);
 
-        return { created, deleted };
+        return { created, completed, deleted };
     }
 
     function renderHistory(dateKey) {
@@ -712,7 +1008,7 @@
         historyDateLabel.textContent = formatFullDate(selected);
 
         historyItems.innerHTML = "";
-        const { created, deleted } = getHistoryForDate(dateKey);
+        const { created, completed, deleted } = getHistoryForDate(dateKey);
         let hasEntries = false;
 
         const addHeading = text => {
@@ -745,20 +1041,27 @@
             } else if (statusText.toLowerCase().includes("completed") || statusText === "Cleared") {
                 status.classList.add("history-status--completed");
             }
-            status.textContent = statusText;
+            status.textContent = STATUS_LABELS[statusText] || statusText;
             li.appendChild(status);
 
             const details = [];
             if (entry.createdAt) {
-                const createdLine = createMetaLine("Created", entry.createdAt);
+                const createdLine = createMetaLine("追加", entry.createdAt);
                 if (createdLine) {
                     details.push(createdLine);
                 }
             }
 
+            if (variant === "completed" && entry.completedAt) {
+                const completedLine = createMetaLine("完了", entry.completedAt);
+                if (completedLine) {
+                    details.push(completedLine);
+                }
+            }
+
             if (variant === "created" && entry.deletedAt) {
                 const deletedLine = createMetaLine(
-                    entry.reason === "cleared" ? "Cleared" : "Deleted",
+                    entry.reason === "cleared" ? "完了済みを削除" : "削除",
                     entry.deletedAt
                 );
                 if (deletedLine) {
@@ -768,7 +1071,7 @@
 
             if (variant === "deleted" && entry.deletedAt) {
                 const deletedLine = createMetaLine(
-                    entry.reason === "cleared" ? "Cleared" : "Deleted",
+                    entry.reason === "cleared" ? "完了済みを削除" : "削除",
                     entry.deletedAt
                 );
                 if (deletedLine) {
@@ -786,9 +1089,17 @@
             historyItems.appendChild(li);
         };
 
+        if (completed.length > 0) {
+            hasEntries = true;
+            addHeading(`完了したタスク（${completed.length}件）`);
+            completed.forEach(entry => {
+                createHistoryItem(entry, "completed");
+            });
+        }
+
         if (created.length > 0) {
             hasEntries = true;
-            addHeading("Created");
+            addHeading("追加したタスク");
             created.forEach(entry => {
                 createHistoryItem(entry, "created");
             });
@@ -796,7 +1107,7 @@
 
         if (deleted.length > 0) {
             hasEntries = true;
-            addHeading("Deleted");
+            addHeading("削除したタスク");
             deleted.forEach(entry => {
                 createHistoryItem(entry, "deleted");
             });
@@ -852,6 +1163,18 @@
     });
 
     clearCompletedButton.addEventListener("click", clearCompletedTasks);
+
+    exportButton.addEventListener("click", exportData);
+    importButton.addEventListener("click", () => {
+        importInput.click();
+    });
+    importInput.addEventListener("change", () => {
+        const [file] = importInput.files;
+        if (file) {
+            importData(file);
+        }
+        importInput.value = "";
+    });
 
     if (historyEnabled) {
         prevMonthButton.addEventListener("click", () => {
