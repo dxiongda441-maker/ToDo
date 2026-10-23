@@ -4,6 +4,15 @@
     const BACKUP_STORAGE_KEY = "todo.lastBackupAt.v1";
     const BACKUP_REMINDER_DAYS = 7;
     const DAY_MS = 24 * 60 * 60 * 1000;
+    const LOCALE = "ja-JP";
+    const STATUS_LABELS = {
+        "Active": "未完了",
+        "Completed": "完了",
+        "Completed (archived)": "完了（削除済み）",
+        "Completed then deleted": "完了後に削除",
+        "Cleared": "完了済みを削除",
+        "Deleted": "削除"
+    };
     const form = document.querySelector("#todo-form");
     const input = document.querySelector("#task-input");
     const list = document.querySelector("#task-list");
@@ -40,7 +49,7 @@
         let fullDate = null;
         let weekday = null;
         try {
-            dateTime = new Intl.DateTimeFormat(undefined, {
+            dateTime = new Intl.DateTimeFormat(LOCALE, {
                 dateStyle: "medium",
                 timeStyle: "short"
             });
@@ -48,7 +57,7 @@
             dateTime = null;
         }
         try {
-            month = new Intl.DateTimeFormat(undefined, {
+            month = new Intl.DateTimeFormat(LOCALE, {
                 month: "long",
                 year: "numeric"
             });
@@ -56,14 +65,14 @@
             month = null;
         }
         try {
-            fullDate = new Intl.DateTimeFormat(undefined, {
+            fullDate = new Intl.DateTimeFormat(LOCALE, {
                 dateStyle: "full"
             });
         } catch (_error) {
             fullDate = null;
         }
         try {
-            weekday = new Intl.DateTimeFormat(undefined, {
+            weekday = new Intl.DateTimeFormat(LOCALE, {
                 weekday: "short"
             });
         } catch (_error) {
@@ -74,7 +83,7 @@
     })();
 
     const weekdayNames = (() => {
-        const fallback = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const fallback = ["日", "月", "火", "水", "木", "金", "土"];
         if (!formatters.weekday) {
             return fallback;
         }
@@ -141,21 +150,7 @@
             }
         }
 
-        const monthNames = [
-            "January",
-            "February",
-            "March",
-            "April",
-            "May",
-            "June",
-            "July",
-            "August",
-            "September",
-            "October",
-            "November",
-            "December"
-        ];
-        return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+        return `${date.getFullYear()}年${date.getMonth() + 1}月`;
     }
 
     function toDateKey(value) {
@@ -528,7 +523,7 @@
                 const metaDate = new Date(showCompleted ? task.completedAt : task.createdAt);
                 const stamp = formatTimestamp(metaDate);
                 meta.dateTime = metaDate.toISOString();
-                meta.textContent = stamp ? `${showCompleted ? "Completed" : "Added"} ${stamp}` : "";
+                meta.textContent = stamp ? `${showCompleted ? "完了" : "追加"}: ${stamp}` : "";
                 meta.hidden = stamp === "";
             }
 
@@ -557,11 +552,8 @@
     function updateSummary() {
         const total = tasks.length;
         const completed = tasks.filter(task => task.completed).length;
-        const totalLabel = total === 1 ? "task" : "tasks";
-        const completedLabel = completed === 1 ? "completed task" : "completed tasks";
-
-        taskCountEl.textContent = `${total} ${totalLabel}`;
-        completedCountEl.textContent = `${completed} ${completedLabel}`;
+        taskCountEl.textContent = `タスク ${total}件`;
+        completedCountEl.textContent = `完了 ${completed}件`;
     }
 
     function updateClearButtonState() {
@@ -588,7 +580,7 @@
             return;
         }
 
-        const nextText = window.prompt("Edit task", task.text);
+        const nextText = window.prompt("タスクを編集", task.text);
         if (nextText === null) {
             return;
         }
@@ -737,13 +729,13 @@
             const labelParts = [formatFullDate(cellDate)];
             if (stat) {
                 if (stat.created > 0) {
-                    labelParts.push(`${stat.created} created`);
+                    labelParts.push(`追加 ${stat.created}件`);
                 }
                 if (stat.completed > 0) {
-                    labelParts.push(`${stat.completed} completed`);
+                    labelParts.push(`完了 ${stat.completed}件`);
                 }
                 if (stat.deleted > 0) {
-                    labelParts.push(`${stat.deleted} deleted`);
+                    labelParts.push(`削除 ${stat.deleted}件`);
                 }
             }
             button.setAttribute("aria-label", labelParts.join(", "));
@@ -762,7 +754,7 @@
             } else if (totalEvents > 0) {
                 const count = document.createElement("span");
                 count.className = "day-events";
-                count.textContent = `${totalEvents} item${totalEvents === 1 ? "" : "s"}`;
+                count.textContent = `${totalEvents}件`;
                 button.appendChild(count);
             }
 
@@ -888,19 +880,19 @@
             } else if (statusText.toLowerCase().includes("completed") || statusText === "Cleared") {
                 status.classList.add("history-status--completed");
             }
-            status.textContent = statusText;
+            status.textContent = STATUS_LABELS[statusText] || statusText;
             li.appendChild(status);
 
             const details = [];
             if (entry.createdAt) {
-                const createdLine = createMetaLine("Created", entry.createdAt);
+                const createdLine = createMetaLine("追加", entry.createdAt);
                 if (createdLine) {
                     details.push(createdLine);
                 }
             }
 
             if (variant === "completed" && entry.completedAt) {
-                const completedLine = createMetaLine("Completed", entry.completedAt);
+                const completedLine = createMetaLine("完了", entry.completedAt);
                 if (completedLine) {
                     details.push(completedLine);
                 }
@@ -908,7 +900,7 @@
 
             if (variant === "created" && entry.deletedAt) {
                 const deletedLine = createMetaLine(
-                    entry.reason === "cleared" ? "Cleared" : "Deleted",
+                    entry.reason === "cleared" ? "完了済みを削除" : "削除",
                     entry.deletedAt
                 );
                 if (deletedLine) {
@@ -918,7 +910,7 @@
 
             if (variant === "deleted" && entry.deletedAt) {
                 const deletedLine = createMetaLine(
-                    entry.reason === "cleared" ? "Cleared" : "Deleted",
+                    entry.reason === "cleared" ? "完了済みを削除" : "削除",
                     entry.deletedAt
                 );
                 if (deletedLine) {
@@ -938,7 +930,7 @@
 
         if (completed.length > 0) {
             hasEntries = true;
-            addHeading(`Completed (${completed.length})`);
+            addHeading(`完了したタスク（${completed.length}件）`);
             completed.forEach(entry => {
                 createHistoryItem(entry, "completed");
             });
@@ -946,7 +938,7 @@
 
         if (created.length > 0) {
             hasEntries = true;
-            addHeading("Created");
+            addHeading("追加したタスク");
             created.forEach(entry => {
                 createHistoryItem(entry, "created");
             });
@@ -954,7 +946,7 @@
 
         if (deleted.length > 0) {
             hasEntries = true;
-            addHeading("Deleted");
+            addHeading("削除したタスク");
             deleted.forEach(entry => {
                 createHistoryItem(entry, "deleted");
             });
