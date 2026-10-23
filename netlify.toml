@@ -1,0 +1,10 @@
+# Netlify で学習アプリ（study/）だけを公開する設定。ビルドは不要（静的ファイルのみ）。
+[build]
+  publish = "study"
+  command = ""
+
+# アプリ本体の更新がすぐ反映されるよう、HTML と JS はキャッシュさせない
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "no-cache"
