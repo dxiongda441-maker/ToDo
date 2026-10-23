@@ -106,6 +106,8 @@
     let archivedTasks = [];
     let activeFilter = "all";
     let editingId = null;
+    // Unsaved editor values, kept so re-rendering other tasks does not discard them.
+    let editDraft = null;
     const todayKey = toDateKey(Date.now());
     let selectedDate = todayKey;
     let currentMonth = startOfMonth(new Date());
@@ -410,9 +412,10 @@
         updateBackupStatus();
     }
 
-    function mergeById(current, incoming) {
-        const knownIds = new Set(current.map(item => item.id));
+    // knownIds spans live tasks and the archive so one task never ends up in both.
+    function mergeById(current, incoming, knownIds) {
         const added = incoming.filter(item => !knownIds.has(item.id));
+        added.forEach(item => knownIds.add(item.id));
         return { merged: [...current, ...added], addedCount: added.length };
     }
 
@@ -435,8 +438,9 @@
                 return;
             }
 
-            const nextTasks = mergeById(tasks, normalizeList(incomingTasks, normalizeTask).items);
-            const nextArchive = mergeById(archivedTasks, normalizeList(incomingArchive, normalizeArchiveRecord).items);
+            const knownIds = new Set([...tasks, ...archivedTasks].map(item => item.id));
+            const nextTasks = mergeById(tasks, normalizeList(incomingTasks, normalizeTask).items, knownIds);
+            const nextArchive = mergeById(archivedTasks, normalizeList(incomingArchive, normalizeArchiveRecord).items, knownIds);
             if (nextTasks.addedCount === 0 && nextArchive.addedCount === 0) {
                 window.alert("新しく追加されるデータはありませんでした（すべて取り込み済みです）。");
                 return;
@@ -578,11 +582,16 @@
         const cancelButton = node.querySelector(".cancel-button");
 
         item.dataset.id = task.id;
-        textInput.value = task.text;
-        dueField.value = task.dueDate;
+        textInput.value = editDraft ? editDraft.text : task.text;
+        dueField.value = editDraft ? editDraft.dueDate : task.dueDate;
+
+        form.addEventListener("input", () => {
+            editDraft = { text: textInput.value, dueDate: dueField.value };
+        });
 
         const cancel = () => {
             editingId = null;
+            editDraft = null;
             renderTasks();
         };
 
@@ -727,6 +736,7 @@
 
     function startEdit(id) {
         editingId = id;
+        editDraft = null;
         renderTasks();
     }
 
@@ -740,6 +750,7 @@
         task.text = trimmed;
         task.dueDate = normalizeDueDate(dueDate);
         editingId = null;
+        editDraft = null;
         saveTasks();
         renderTasks();
     }
