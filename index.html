@@ -19,6 +19,16 @@
             <label class="visually-hidden" for="task-input">タスク</label>
             <input id="task-input" name="task" type="text" placeholder="新しいタスクを入力" required>
             <button type="submit">追加</button>
+            <div class="form-options">
+                <label class="due-field">
+                    <span>期限</span>
+                    <input id="due-input" name="due" type="date">
+                </label>
+                <label class="important-field">
+                    <input id="important-input" name="important" type="checkbox">
+                    <span>★ 重要</span>
+                </label>
+            </div>
         </form>
 
         <section class="controls" aria-label="タスクの操作">
@@ -38,6 +48,7 @@
         <footer class="summary" aria-live="polite">
             <span id="task-count">タスク 0件</span>
             <span id="completed-count">完了 0件</span>
+            <span id="overdue-count" class="overdue-count" hidden></span>
         </footer>
 
         <section class="backup-section" aria-label="バックアップ">
@@ -75,13 +86,35 @@
                 <input type="checkbox" class="task-toggle">
                 <span class="task-body">
                     <span class="task-text"></span>
-                    <time class="task-meta" datetime=""></time>
+                    <span class="task-info">
+                        <span class="task-due" hidden></span>
+                        <time class="task-meta" datetime=""></time>
+                    </span>
                 </span>
             </label>
             <div class="task-actions">
+                <button type="button" class="important-button" title="重要マークを切り替え" aria-pressed="false">☆</button>
                 <button type="button" class="edit-button" title="タスクを編集">編集</button>
                 <button type="button" class="delete-button" title="タスクを削除">削除</button>
             </div>
+        </li>
+    </template>
+
+    <template id="task-edit-template">
+        <li class="task-item task-item--editing">
+            <form class="task-edit-form">
+                <input type="text" class="edit-text" aria-label="タスク名" required>
+                <div class="task-edit-row">
+                    <label class="due-field">
+                        <span>期限</span>
+                        <input type="date" class="edit-due">
+                    </label>
+                    <div class="task-edit-buttons">
+                        <button type="submit" class="save-button">保存</button>
+                        <button type="button" class="cancel-button">キャンセル</button>
+                    </div>
+                </div>
+            </form>
         </li>
     </template>
 

@@ -15,6 +15,10 @@
     };
     const form = document.querySelector("#todo-form");
     const input = document.querySelector("#task-input");
+    const dueInput = document.querySelector("#due-input");
+    const importantInput = document.querySelector("#important-input");
+    const editTemplate = document.querySelector("#task-edit-template");
+    const overdueCountEl = document.querySelector("#overdue-count");
     const list = document.querySelector("#task-list");
     const template = document.querySelector("#task-template");
     const taskCountEl = document.querySelector("#task-count");
@@ -101,6 +105,7 @@
     let tasks = [];
     let archivedTasks = [];
     let activeFilter = "all";
+    let editingId = null;
     const todayKey = toDateKey(Date.now());
     let selectedDate = todayKey;
     let currentMonth = startOfMonth(new Date());
@@ -214,6 +219,10 @@
         return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
     }
 
+    function normalizeDueDate(value) {
+        return typeof value === "string" && createDateFromKey(value) ? value : "";
+    }
+
     function normalizeTask(item, now) {
         if (!item || typeof item.text !== "string") {
             return { task: null, migrated: true };
@@ -246,7 +255,9 @@
                 text,
                 completed,
                 createdAt,
-                completedAt
+                completedAt,
+                dueDate: normalizeDueDate(item.dueDate),
+                important: Boolean(item.important)
             },
             migrated
         };
@@ -451,7 +462,7 @@
         reader.readAsText(file);
     }
 
-    function createTask(text) {
+    function createTask(text, dueDate, important) {
         const trimmed = text.trim();
         if (!trimmed) {
             return null;
@@ -462,7 +473,9 @@
             text: trimmed,
             completed: false,
             createdAt: Date.now(),
-            completedAt: null
+            completedAt: null,
+            dueDate: normalizeDueDate(dueDate),
+            important: Boolean(important)
         };
     }
 
@@ -478,6 +491,8 @@
             deletedAt: Date.now(),
             completed: Boolean(task.completed),
             completedAt: task.completedAt || null,
+            dueDate: task.dueDate || "",
+            important: Boolean(task.important),
             reason: reason || "deleted"
         };
 
@@ -496,27 +511,137 @@
         }
     }
 
+    // Open tasks first: important, then nearest due date (none last), then newest.
+    // Completed tasks follow, most recently completed first.
+    function compareTasks(a, b) {
+        if (a.completed !== b.completed) {
+            return a.completed ? 1 : -1;
+        }
+
+        if (a.completed) {
+            return (b.completedAt || 0) - (a.completedAt || 0);
+        }
+
+        if (a.important !== b.important) {
+            return a.important ? -1 : 1;
+        }
+
+        if (a.dueDate !== b.dueDate) {
+            if (!a.dueDate) {
+                return 1;
+            }
+            if (!b.dueDate) {
+                return -1;
+            }
+            return a.dueDate < b.dueDate ? -1 : 1;
+        }
+
+        return b.createdAt - a.createdAt;
+    }
+
+    function isOverdue(task, todayDateKey) {
+        return !task.completed && Boolean(task.dueDate) && task.dueDate < todayDateKey;
+    }
+
+    function describeDue(task, todayDateKey) {
+        const dueDate = createDateFromKey(task.dueDate);
+        if (!dueDate) {
+            return null;
+        }
+
+        const today = createDateFromKey(todayDateKey);
+        const days = Math.round((dueDate - today) / DAY_MS);
+        const weekday = weekdayNames[dueDate.getDay()];
+        const shortDate = `${dueDate.getMonth() + 1}/${dueDate.getDate()}(${weekday})`;
+
+        if (task.completed) {
+            return { text: `期限 ${shortDate}`, state: "done" };
+        }
+        if (days < 0) {
+            return { text: `期限切れ ${shortDate}`, state: "overdue" };
+        }
+        if (days === 0) {
+            return { text: "今日まで", state: "today" };
+        }
+        if (days === 1) {
+            return { text: "明日まで", state: "soon" };
+        }
+        return { text: `${shortDate}まで`, state: days <= 3 ? "soon" : "later" };
+    }
+
+    function renderEditor(task) {
+        const node = document.importNode(editTemplate.content, true);
+        const item = node.querySelector(".task-item");
+        const form = node.querySelector(".task-edit-form");
+        const textInput = node.querySelector(".edit-text");
+        const dueField = node.querySelector(".edit-due");
+        const cancelButton = node.querySelector(".cancel-button");
+
+        item.dataset.id = task.id;
+        textInput.value = task.text;
+        dueField.value = task.dueDate;
+
+        const cancel = () => {
+            editingId = null;
+            renderTasks();
+        };
+
+        form.addEventListener("submit", event => {
+            event.preventDefault();
+            saveEdit(task.id, textInput.value, dueField.value);
+        });
+        form.addEventListener("keydown", event => {
+            if (event.key === "Escape") {
+                cancel();
+            }
+        });
+        cancelButton.addEventListener("click", cancel);
+
+        return node;
+    }
+
     function renderTasks() {
         list.innerHTML = "";
-        const filtered = getFilteredTasks();
+        const filtered = getFilteredTasks().sort(compareTasks);
+        const todayDateKey = toDateKey(Date.now());
 
         emptyStateEl.hidden = filtered.length !== 0;
 
         const fragment = document.createDocumentFragment();
 
         filtered.forEach(task => {
+            if (task.id === editingId) {
+                fragment.appendChild(renderEditor(task));
+                return;
+            }
+
             const node = document.importNode(template.content, true);
             const item = node.querySelector(".task-item");
             const toggle = node.querySelector(".task-toggle");
             const text = node.querySelector(".task-text");
             const meta = node.querySelector(".task-meta");
+            const due = node.querySelector(".task-due");
+            const importantButton = node.querySelector(".important-button");
             const editButton = node.querySelector(".edit-button");
             const deleteButton = node.querySelector(".delete-button");
 
             item.dataset.id = task.id;
             item.classList.toggle("completed", Boolean(task.completed));
+            item.classList.toggle("important", Boolean(task.important));
+            item.classList.toggle("overdue", isOverdue(task, todayDateKey));
             toggle.checked = Boolean(task.completed);
             text.textContent = task.text;
+
+            const dueInfo = describeDue(task, todayDateKey);
+            due.hidden = !dueInfo;
+            if (dueInfo) {
+                due.textContent = dueInfo.text;
+                due.classList.add(`task-due--${dueInfo.state}`);
+            }
+
+            importantButton.textContent = task.important ? "★" : "☆";
+            importantButton.setAttribute("aria-pressed", task.important ? "true" : "false");
+            importantButton.setAttribute("aria-label", task.important ? "重要マークを外す" : "重要にする");
 
             if (meta) {
                 const showCompleted = task.completed && task.completedAt;
@@ -531,8 +656,12 @@
                 toggleTask(task.id, toggle.checked);
             });
 
+            importantButton.addEventListener("click", () => {
+                toggleImportant(task.id);
+            });
+
             editButton.addEventListener("click", () => {
-                editTask(task.id);
+                startEdit(task.id);
             });
 
             deleteButton.addEventListener("click", () => {
@@ -543,6 +672,12 @@
         });
 
         list.appendChild(fragment);
+
+        const editText = list.querySelector(".edit-text");
+        if (editText && document.activeElement !== editText) {
+            editText.focus();
+        }
+
         updateSummary();
         updateClearButtonState();
         updateBackupStatus();
@@ -554,6 +689,11 @@
         const completed = tasks.filter(task => task.completed).length;
         taskCountEl.textContent = `タスク ${total}件`;
         completedCountEl.textContent = `完了 ${completed}件`;
+
+        const todayDateKey = toDateKey(Date.now());
+        const overdue = tasks.filter(task => isOverdue(task, todayDateKey)).length;
+        overdueCountEl.hidden = overdue === 0;
+        overdueCountEl.textContent = `期限切れ ${overdue}件`;
     }
 
     function updateClearButtonState() {
@@ -574,24 +714,32 @@
         renderTasks();
     }
 
-    function editTask(id) {
+    function toggleImportant(id) {
         const task = tasks.find(item => item.id === id);
         if (!task) {
             return;
         }
 
-        const nextText = window.prompt("タスクを編集", task.text);
-        if (nextText === null) {
-            return;
-        }
+        task.important = !task.important;
+        saveTasks();
+        renderTasks();
+    }
 
-        const trimmed = nextText.trim();
-        if (!trimmed) {
-            deleteTask(id);
+    function startEdit(id) {
+        editingId = id;
+        renderTasks();
+    }
+
+    function saveEdit(id, text, dueDate) {
+        const task = tasks.find(item => item.id === id);
+        const trimmed = text.trim();
+        if (!task || !trimmed) {
             return;
         }
 
         task.text = trimmed;
+        task.dueDate = normalizeDueDate(dueDate);
+        editingId = null;
         saveTasks();
         renderTasks();
     }
@@ -623,7 +771,7 @@
     function handleFormSubmit(event) {
         event.preventDefault();
         const value = input.value;
-        const task = createTask(value);
+        const task = createTask(value, dueInput.value, importantInput.checked);
         if (!task) {
             input.focus();
             return;
@@ -631,6 +779,8 @@
 
         tasks.unshift(task);
         input.value = "";
+        dueInput.value = "";
+        importantInput.checked = false;
         input.focus();
         saveTasks();
         renderTasks();
