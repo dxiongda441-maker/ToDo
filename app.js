@@ -1,6 +1,9 @@
 (() => {
     const STORAGE_KEY = "todo.tasks.v1";
     const ARCHIVE_STORAGE_KEY = "todo.archive.v1";
+    const BACKUP_STORAGE_KEY = "todo.lastBackupAt.v1";
+    const BACKUP_REMINDER_DAYS = 7;
+    const DAY_MS = 24 * 60 * 60 * 1000;
     const form = document.querySelector("#todo-form");
     const input = document.querySelector("#task-input");
     const list = document.querySelector("#task-list");
@@ -17,6 +20,10 @@
     const historyDateLabel = document.querySelector("#history-date-label");
     const historyItems = document.querySelector("#history-items");
     const historyEmpty = document.querySelector("#history-empty");
+    const exportButton = document.querySelector("#export-button");
+    const importButton = document.querySelector("#import-button");
+    const importInput = document.querySelector("#import-input");
+    const backupStatusEl = document.querySelector("#backup-status");
     const historyEnabled = Boolean(
         calendarGrid &&
         monthLabelEl &&
@@ -212,53 +219,86 @@
         return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
     }
 
+    function normalizeTask(item, now) {
+        if (!item || typeof item.text !== "string") {
+            return { task: null, migrated: true };
+        }
+
+        const text = item.text.trim();
+        if (!text) {
+            return { task: null, migrated: true };
+        }
+
+        let migrated = false;
+        const createdAt = typeof item.createdAt === "number" ? item.createdAt : now;
+        if (typeof item.createdAt !== "number") {
+            migrated = true;
+        }
+
+        let id = item.id;
+        if (typeof id !== "string" || !id.trim()) {
+            id = generateId();
+            migrated = true;
+        }
+
+        return {
+            task: {
+                id,
+                text,
+                completed: Boolean(item.completed),
+                createdAt
+            },
+            migrated
+        };
+    }
+
+    function normalizeArchiveRecord(item, now) {
+        const { task, migrated } = normalizeTask(item, now);
+        if (!task) {
+            return { record: null, migrated };
+        }
+
+        const deletedAt = typeof item.deletedAt === "number" ? item.deletedAt : task.createdAt;
+        const reason = typeof item.reason === "string" ? item.reason : "deleted";
+
+        return {
+            record: { ...task, deletedAt, reason },
+            migrated: migrated || typeof item.deletedAt !== "number"
+        };
+    }
+
+    function normalizeList(list, normalize) {
+        const now = Date.now();
+        let migrated = false;
+        const items = list.map(item => {
+            const result = normalize(item, now);
+            migrated = migrated || result.migrated;
+            return result.task || result.record;
+        }).filter(Boolean);
+
+        return { items, migrated };
+    }
+
+    function readStoredArray(key) {
+        const raw = localStorage.getItem(key);
+        if (!raw) {
+            return null;
+        }
+
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : null;
+    }
+
     function loadTasks() {
         tasks = [];
         try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (!raw) {
+            const parsed = readStoredArray(STORAGE_KEY);
+            if (!parsed) {
                 return;
             }
 
-            const parsed = JSON.parse(raw);
-            if (!Array.isArray(parsed)) {
-                return;
-            }
-
-            let migrated = false;
-            const now = Date.now();
-
-            tasks = parsed.map(item => {
-                if (!item || typeof item.text !== "string") {
-                    migrated = true;
-                    return null;
-                }
-
-                const text = item.text.trim();
-                if (!text) {
-                    migrated = true;
-                    return null;
-                }
-
-                const createdAt = typeof item.createdAt === "number" ? item.createdAt : now;
-                if (typeof item.createdAt !== "number") {
-                    migrated = true;
-                }
-
-                let id = item.id;
-                if (typeof id !== "string" || !id.trim()) {
-                    id = generateId();
-                    migrated = true;
-                }
-
-                return {
-                    id,
-                    text,
-                    completed: Boolean(item.completed),
-                    createdAt
-                };
-            }).filter(Boolean);
-
+            const { items, migrated } = normalizeList(parsed, normalizeTask);
+            tasks = items;
             if (migrated) {
                 saveTasks();
             }
@@ -271,53 +311,13 @@
     function loadArchive() {
         archivedTasks = [];
         try {
-            const raw = localStorage.getItem(ARCHIVE_STORAGE_KEY);
-            if (!raw) {
+            const parsed = readStoredArray(ARCHIVE_STORAGE_KEY);
+            if (!parsed) {
                 return;
             }
 
-            const parsed = JSON.parse(raw);
-            if (!Array.isArray(parsed)) {
-                return;
-            }
-
-            let migrated = false;
-            archivedTasks = parsed.map(item => {
-                if (!item || typeof item.text !== "string") {
-                    migrated = true;
-                    return null;
-                }
-
-                const text = item.text.trim();
-                if (!text) {
-                    migrated = true;
-                    return null;
-                }
-
-                const createdAt = typeof item.createdAt === "number" ? item.createdAt : Date.now();
-                const deletedAt = typeof item.deletedAt === "number" ? item.deletedAt : createdAt;
-                if (typeof item.createdAt !== "number" || typeof item.deletedAt !== "number") {
-                    migrated = true;
-                }
-
-                let id = item.id;
-                if (typeof id !== "string" || !id.trim()) {
-                    id = generateId();
-                    migrated = true;
-                }
-
-                const reason = typeof item.reason === "string" ? item.reason : "deleted";
-
-                return {
-                    id,
-                    text,
-                    createdAt,
-                    deletedAt,
-                    completed: Boolean(item.completed),
-                    reason
-                };
-            }).filter(Boolean);
-
+            const { items, migrated } = normalizeList(parsed, normalizeArchiveRecord);
+            archivedTasks = items;
             if (migrated) {
                 saveArchive();
             }
@@ -341,6 +341,114 @@
         } catch (error) {
             console.warn("Failed to save archive", error);
         }
+    }
+
+    function loadLastBackupAt() {
+        try {
+            const value = Number(localStorage.getItem(BACKUP_STORAGE_KEY));
+            return Number.isFinite(value) && value > 0 ? value : null;
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    function updateBackupStatus() {
+        const lastBackupAt = loadLastBackupAt();
+        const hasData = tasks.length > 0 || archivedTasks.length > 0;
+        let text;
+        let overdue = false;
+
+        if (lastBackupAt === null) {
+            text = hasData ? "まだバックアップがありません。一度書き出しておきましょう。" : "バックアップはまだありません。";
+            overdue = hasData;
+        } else {
+            const days = Math.floor((Date.now() - lastBackupAt) / DAY_MS);
+            const when = days === 0 ? "今日" : `${days}日前`;
+            text = `最終バックアップ: ${when}（${formatTimestamp(new Date(lastBackupAt))}）`;
+            overdue = hasData && days >= BACKUP_REMINDER_DAYS;
+        }
+
+        backupStatusEl.textContent = text;
+        backupStatusEl.classList.toggle("backup-status--warning", overdue);
+    }
+
+    function exportData() {
+        const now = new Date();
+        const payload = {
+            app: "todo",
+            version: 1,
+            exportedAt: now.getTime(),
+            tasks,
+            archive: archivedTasks
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `todo-backup-${toDateKey(now)}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+
+        try {
+            localStorage.setItem(BACKUP_STORAGE_KEY, String(now.getTime()));
+        } catch (error) {
+            console.warn("Failed to save backup time", error);
+        }
+        updateBackupStatus();
+    }
+
+    function mergeById(current, incoming) {
+        const knownIds = new Set(current.map(item => item.id));
+        const added = incoming.filter(item => !knownIds.has(item.id));
+        return { merged: [...current, ...added], addedCount: added.length };
+    }
+
+    function importData(file) {
+        const reader = new FileReader();
+        reader.addEventListener("load", () => {
+            let payload;
+            try {
+                payload = JSON.parse(String(reader.result));
+            } catch (_error) {
+                window.alert("ファイルを読み込めませんでした。バックアップのJSONファイルを選んでください。");
+                return;
+            }
+
+            // A bare array is accepted as a plain task list.
+            const incomingTasks = Array.isArray(payload) ? payload : payload && payload.tasks;
+            const incomingArchive = payload && Array.isArray(payload.archive) ? payload.archive : [];
+            if (!Array.isArray(incomingTasks)) {
+                window.alert("このファイルにはタスクが含まれていません。");
+                return;
+            }
+
+            const nextTasks = mergeById(tasks, normalizeList(incomingTasks, normalizeTask).items);
+            const nextArchive = mergeById(archivedTasks, normalizeList(incomingArchive, normalizeArchiveRecord).items);
+            if (nextTasks.addedCount === 0 && nextArchive.addedCount === 0) {
+                window.alert("新しく追加されるデータはありませんでした（すべて取り込み済みです）。");
+                return;
+            }
+
+            const confirmed = window.confirm(
+                `タスク ${nextTasks.addedCount} 件、履歴 ${nextArchive.addedCount} 件を追加します。\n` +
+                "今あるデータはそのまま残ります。よろしいですか？"
+            );
+            if (!confirmed) {
+                return;
+            }
+
+            tasks = nextTasks.merged;
+            archivedTasks = nextArchive.merged;
+            saveTasks();
+            saveArchive();
+            renderTasks();
+        });
+        reader.addEventListener("error", () => {
+            window.alert("ファイルを読み込めませんでした。");
+        });
+        reader.readAsText(file);
     }
 
     function createTask(text) {
@@ -434,6 +542,7 @@
         list.appendChild(fragment);
         updateSummary();
         updateClearButtonState();
+        updateBackupStatus();
         refreshHistoryViews();
     }
 
@@ -852,6 +961,18 @@
     });
 
     clearCompletedButton.addEventListener("click", clearCompletedTasks);
+
+    exportButton.addEventListener("click", exportData);
+    importButton.addEventListener("click", () => {
+        importInput.click();
+    });
+    importInput.addEventListener("change", () => {
+        const [file] = importInput.files;
+        if (file) {
+            importData(file);
+        }
+        importInput.value = "";
+    });
 
     if (historyEnabled) {
         prevMonthButton.addEventListener("click", () => {

@@ -328,6 +328,45 @@ body.dark .summary {
     color: rgba(30, 64, 175, 0.6);
 }
 
+.backup-section {
+    margin-top: 1.5rem;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.backup-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.backup-button {
+    border: 1px solid rgba(37, 99, 235, 0.3);
+    background: rgba(37, 99, 235, 0.08);
+    color: var(--accent-hover);
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.backup-button:hover,
+.backup-button:focus-visible {
+    background: rgba(37, 99, 235, 0.18);
+}
+
+.backup-status {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.backup-status--warning {
+    color: #b45309;
+    font-weight: 600;
+}
+
 .history-section {
     margin-top: 2.5rem;
     background: rgba(255, 255, 255, 0.75);

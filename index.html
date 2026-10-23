@@ -34,6 +34,15 @@
             <span id="completed-count">0 completed tasks</span>
         </footer>
 
+        <section class="backup-section" aria-label="バックアップ">
+            <div class="backup-actions">
+                <button type="button" id="export-button" class="backup-button">バックアップを書き出す</button>
+                <button type="button" id="import-button" class="backup-button">バックアップから復元</button>
+                <input type="file" id="import-input" accept="application/json,.json" hidden>
+            </div>
+            <p id="backup-status" class="backup-status" aria-live="polite"></p>
+        </section>
+
         <section class="history-section" aria-label="Task history">
             <header class="history-header">
                 <h2>Task History</h2>
