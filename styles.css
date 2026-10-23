@@ -489,6 +489,21 @@ body.dark .calendar-day {
     line-height: 1;
 }
 
+.calendar-day.has-completed {
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.45);
+}
+
+.calendar-day .day-completed {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #047857;
+}
+
+body.dark .calendar-day .day-completed {
+    color: #6ee7b7;
+}
+
 .calendar-day .day-events {
     font-size: 0.7rem;
     color: #64748b;

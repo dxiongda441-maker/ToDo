@@ -241,12 +241,17 @@
             migrated = true;
         }
 
+        const completed = Boolean(item.completed);
+        // Tasks completed before completion times were tracked keep a null completedAt.
+        const completedAt = completed && typeof item.completedAt === "number" ? item.completedAt : null;
+
         return {
             task: {
                 id,
                 text,
-                completed: Boolean(item.completed),
-                createdAt
+                completed,
+                createdAt,
+                completedAt
             },
             migrated
         };
@@ -461,7 +466,8 @@
             id: generateId(),
             text: trimmed,
             completed: false,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            completedAt: null
         };
     }
 
@@ -476,6 +482,7 @@
             createdAt: task.createdAt,
             deletedAt: Date.now(),
             completed: Boolean(task.completed),
+            completedAt: task.completedAt || null,
             reason: reason || "deleted"
         };
 
@@ -517,10 +524,11 @@
             text.textContent = task.text;
 
             if (meta) {
-                const createdAtDate = new Date(task.createdAt);
-                const stamp = formatTimestamp(createdAtDate);
-                meta.dateTime = createdAtDate.toISOString();
-                meta.textContent = stamp ? `Added ${stamp}` : "";
+                const showCompleted = task.completed && task.completedAt;
+                const metaDate = new Date(showCompleted ? task.completedAt : task.createdAt);
+                const stamp = formatTimestamp(metaDate);
+                meta.dateTime = metaDate.toISOString();
+                meta.textContent = stamp ? `${showCompleted ? "Completed" : "Added"} ${stamp}` : "";
                 meta.hidden = stamp === "";
             }
 
@@ -569,6 +577,7 @@
         }
 
         task.completed = Boolean(completed);
+        task.completedAt = task.completed ? Date.now() : null;
         saveTasks();
         renderTasks();
     }
@@ -661,17 +670,19 @@
             if (!dateKey) {
                 return;
             }
-            const record = stats.get(dateKey) || { created: 0, deleted: 0 };
+            const record = stats.get(dateKey) || { created: 0, completed: 0, deleted: 0 };
             record[type] += 1;
             stats.set(dateKey, record);
         };
 
         tasks.forEach(task => {
             increment(toDateKey(task.createdAt), "created");
+            increment(toDateKey(task.completedAt), "completed");
         });
 
         archivedTasks.forEach(task => {
             increment(toDateKey(task.createdAt), "created");
+            increment(toDateKey(task.completedAt), "completed");
             increment(toDateKey(task.deletedAt), "deleted");
         });
 
@@ -708,7 +719,7 @@
             const dateKey = toDateKey(cellDate);
             const isCurrentMonth = cellDate.getMonth() === monthStart.getMonth();
             const stat = stats.get(dateKey);
-            const totalEvents = stat ? stat.created + stat.deleted : 0;
+            const totalEvents = stat ? stat.created + stat.completed + stat.deleted : 0;
 
             const button = document.createElement("button");
             button.type = "button";
@@ -728,6 +739,9 @@
                 if (stat.created > 0) {
                     labelParts.push(`${stat.created} created`);
                 }
+                if (stat.completed > 0) {
+                    labelParts.push(`${stat.completed} completed`);
+                }
                 if (stat.deleted > 0) {
                     labelParts.push(`${stat.deleted} deleted`);
                 }
@@ -739,7 +753,13 @@
             dayNumber.textContent = String(cellDate.getDate());
             button.appendChild(dayNumber);
 
-            if (totalEvents > 0) {
+            if (stat && stat.completed > 0) {
+                button.classList.add("has-completed");
+                const done = document.createElement("span");
+                done.className = "day-completed";
+                done.textContent = `✓${stat.completed}`;
+                button.appendChild(done);
+            } else if (totalEvents > 0) {
                 const count = document.createElement("span");
                 count.className = "day-events";
                 count.textContent = `${totalEvents} item${totalEvents === 1 ? "" : "s"}`;
@@ -756,11 +776,24 @@
 
     function getHistoryForDate(dateKey) {
         const created = [];
+        const completed = [];
         const deleted = [];
 
         if (!dateKey) {
-            return { created, deleted };
+            return { created, completed, deleted };
         }
+
+        [...tasks, ...archivedTasks].forEach(task => {
+            if (toDateKey(task.completedAt) === dateKey) {
+                completed.push({
+                    id: task.id,
+                    text: task.text,
+                    createdAt: task.createdAt,
+                    completedAt: task.completedAt,
+                    status: "Completed"
+                });
+            }
+        });
 
         tasks.forEach(task => {
             if (toDateKey(task.createdAt) === dateKey) {
@@ -807,9 +840,10 @@
         });
 
         created.sort((a, b) => b.createdAt - a.createdAt);
+        completed.sort((a, b) => b.completedAt - a.completedAt);
         deleted.sort((a, b) => b.deletedAt - a.deletedAt);
 
-        return { created, deleted };
+        return { created, completed, deleted };
     }
 
     function renderHistory(dateKey) {
@@ -821,7 +855,7 @@
         historyDateLabel.textContent = formatFullDate(selected);
 
         historyItems.innerHTML = "";
-        const { created, deleted } = getHistoryForDate(dateKey);
+        const { created, completed, deleted } = getHistoryForDate(dateKey);
         let hasEntries = false;
 
         const addHeading = text => {
@@ -865,6 +899,13 @@
                 }
             }
 
+            if (variant === "completed" && entry.completedAt) {
+                const completedLine = createMetaLine("Completed", entry.completedAt);
+                if (completedLine) {
+                    details.push(completedLine);
+                }
+            }
+
             if (variant === "created" && entry.deletedAt) {
                 const deletedLine = createMetaLine(
                     entry.reason === "cleared" ? "Cleared" : "Deleted",
@@ -894,6 +935,14 @@
 
             historyItems.appendChild(li);
         };
+
+        if (completed.length > 0) {
+            hasEntries = true;
+            addHeading(`Completed (${completed.length})`);
+            completed.forEach(entry => {
+                createHistoryItem(entry, "completed");
+            });
+        }
 
         if (created.length > 0) {
             hasEntries = true;
