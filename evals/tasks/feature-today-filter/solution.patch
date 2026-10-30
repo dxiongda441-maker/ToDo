@@ -1,0 +1,42 @@
+diff --git a/app.js b/app.js
+index 8988d01..eb499e1 100644
+--- a/app.js
++++ b/app.js
+@@ -510,6 +510,11 @@
+                 return tasks.filter(task => !task.completed);
+             case "completed":
+                 return tasks.filter(task => task.completed);
++            case "today": {
++                // Open tasks due today, plus anything already overdue.
++                const todayDateKey = toDateKey(Date.now());
++                return tasks.filter(task => isOverdue(task, todayDateKey) || (!task.completed && task.dueDate === todayDateKey));
++            }
+             default:
+                 return tasks.slice();
+         }
+diff --git a/index.html b/index.html
+index e63dcc3..91e34b3 100644
+--- a/index.html
++++ b/index.html
+@@ -36,6 +36,7 @@
+                 <button type="button" class="filter-button active" data-filter="all">すべて</button>
+                 <button type="button" class="filter-button" data-filter="active">未完了</button>
+                 <button type="button" class="filter-button" data-filter="completed">完了</button>
++                <button type="button" class="filter-button" data-filter="today">今日</button>
+             </div>
+             <button type="button" id="clear-completed" class="clear-button">完了済みを削除</button>
+         </section>
+diff --git a/styles.css b/styles.css
+index 1ef266d..a219c91 100644
+--- a/styles.css
++++ b/styles.css
+@@ -827,7 +827,8 @@ body.dark .history-empty {
+     }
+ 
+     .filter-button {
++        flex: 1;
+         white-space: nowrap;
+-        padding: 0.5rem 0.75rem;
++        padding: 0.5rem 0.5rem;
+     }
+ }

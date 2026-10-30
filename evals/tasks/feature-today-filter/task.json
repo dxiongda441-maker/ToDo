@@ -1,0 +1,14 @@
+{
+  "suite": "capability",
+  "base_ref": "5907db10cae2",
+  "prompt": "絞り込みボタンに「今日」を追加してください。\n\n要件:\n- 既存の「すべて・未完了・完了」と同じ並びに `data-filter=\"today\"` のボタン（表示は「今日」）を追加する\n- 未完了で、期限が今日または期限切れのタスクだけを表示する\n- 期限のないタスクと完了済みのタスクは表示しない\n- 選択中のボタンの見た目（active クラス）は他の絞り込みボタンと同じように切り替わる\n- スマホ幅でもボタンが画面からはみ出さないようにする",
+  "regression": true,
+  "allowed_files": [
+    "index.html",
+    "app.js",
+    "styles.css"
+  ],
+  "judge": {
+    "rubric": "pass の条件: (1) 既存の getFilteredTasks / setFilter の仕組みに沿って実装されている (2) 「今日」の判定が既存の日付ヘルパー（toDateKey, isOverdue など）を再利用している (3) 不要な変更や重複コードがない (4) スマホ幅への配慮がある。"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "todo-evals",
+  "private": true,
+  "description": "Evals that measure how well a coding agent works on this ToDo app",
+  "scripts": {
+    "selfcheck": "node selfcheck.js",
+    "eval": "node run.js"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

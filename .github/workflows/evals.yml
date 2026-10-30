@@ -1,0 +1,88 @@
+name: Evals
+
+on:
+  pull_request:
+    paths:
+      - "evals/**"
+      - ".github/workflows/evals.yml"
+  workflow_dispatch:
+    inputs:
+      trials:
+        description: "Trials per task"
+        default: "3"
+      tasks:
+        description: "Comma-separated task ids (empty = all)"
+        default: ""
+      model:
+        description: "Model for the agent under test (empty = Claude Code default)"
+        default: ""
+      judge:
+        description: "Also run the LLM rubric judge"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Validates the eval itself with no model calls: reference solutions must
+  # pass every task and an untouched workspace must fail every task.
+  selfcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: evals/package-lock.json
+      - run: npm ci
+        working-directory: evals
+      - run: npx playwright install --with-deps chromium
+        working-directory: evals
+      - run: npm run selfcheck
+        working-directory: evals
+
+  agent:
+    if: github.event_name == 'workflow_dispatch'
+    needs: selfcheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: evals/package-lock.json
+      - run: npm ci
+        working-directory: evals
+      - run: npx playwright install --with-deps chromium
+        working-directory: evals
+      - run: npm install -g @anthropic-ai/claude-code
+      - name: Run evals
+        working-directory: evals
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TRIALS: ${{ inputs.trials }}
+          TASKS: ${{ inputs.tasks }}
+          MODEL: ${{ inputs.model }}
+          JUDGE: ${{ inputs.judge }}
+        run: |
+          args=(--trials "$TRIALS" --out-dir results/ci --regression-threshold 0.9)
+          [ -n "$TASKS" ] && args+=(--tasks "$TASKS")
+          [ -n "$MODEL" ] && args+=(--model "$MODEL")
+          [ "$JUDGE" = "true" ] && args+=(--judge)
+          node run.js "${args[@]}"
+      - name: Write job summary
+        if: always()
+        run: cat evals/results/ci/summary.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-results
+          path: evals/results/ci

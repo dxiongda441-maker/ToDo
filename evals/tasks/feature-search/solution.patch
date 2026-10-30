@@ -1,0 +1,110 @@
+diff --git a/app.js b/app.js
+index 8988d01..35b096e 100644
+--- a/app.js
++++ b/app.js
+@@ -24,6 +24,8 @@
+     const taskCountEl = document.querySelector("#task-count");
+     const completedCountEl = document.querySelector("#completed-count");
+     const emptyStateEl = document.querySelector("#empty-state");
++    const searchInput = document.querySelector("#search-input");
++    const searchEmptyEl = document.querySelector("#search-empty");
+     const clearCompletedButton = document.querySelector("#clear-completed");
+     const filterButtons = Array.from(document.querySelectorAll(".filter-button"));
+     const calendarGrid = document.querySelector("#calendar-grid");
+@@ -105,6 +107,7 @@
+     let tasks = [];
+     let archivedTasks = [];
+     let activeFilter = "all";
++    let searchQuery = "";
+     let editingId = null;
+     // Unsaved editor values, kept so re-rendering other tasks does not discard them.
+     let editDraft = null;
+@@ -505,13 +508,16 @@
+     }
+ 
+     function getFilteredTasks() {
++        const matching = searchQuery
++            ? tasks.filter(task => task.text.toLowerCase().includes(searchQuery))
++            : tasks.slice();
+         switch (activeFilter) {
+             case "active":
+-                return tasks.filter(task => !task.completed);
++                return matching.filter(task => !task.completed);
+             case "completed":
+-                return tasks.filter(task => task.completed);
++                return matching.filter(task => task.completed);
+             default:
+-                return tasks.slice();
++                return matching;
+         }
+     }
+ 
+@@ -614,7 +620,10 @@
+         const filtered = getFilteredTasks().sort(compareTasks);
+         const todayDateKey = toDateKey(Date.now());
+ 
+-        emptyStateEl.hidden = filtered.length !== 0;
++        // Searching with no hits gets its own message; the default one means no tasks yet.
++        const noSearchHits = filtered.length === 0 && searchQuery !== "" && tasks.length !== 0;
++        emptyStateEl.hidden = filtered.length !== 0 || noSearchHits;
++        searchEmptyEl.hidden = !noSearchHits;
+ 
+         const fragment = document.createDocumentFragment();
+ 
+@@ -1154,6 +1163,10 @@
+     }
+ 
+     form.addEventListener("submit", handleFormSubmit);
++    searchInput.addEventListener("input", () => {
++        searchQuery = searchInput.value.trim().toLowerCase();
++        renderTasks();
++    });
+ 
+     filterButtons.forEach(button => {
+         button.addEventListener("click", () => {
+diff --git a/index.html b/index.html
+index e63dcc3..669b083 100644
+--- a/index.html
++++ b/index.html
+@@ -40,9 +40,13 @@
+             <button type="button" id="clear-completed" class="clear-button">完了済みを削除</button>
+         </section>
+ 
++        <label class="visually-hidden" for="search-input">タスクを検索</label>
++        <input id="search-input" class="search-input" type="search" placeholder="タスクを検索" autocomplete="off">
++
+         <section aria-label="タスク一覧" class="task-section">
+             <ul id="task-list" class="task-list" aria-live="polite"></ul>
+             <p id="empty-state" class="empty-state" hidden>タスクはまだありません。上の入力欄から追加しましょう。</p>
++            <p id="search-empty" class="empty-state" hidden>該当するタスクはありません</p>
+         </section>
+ 
+         <footer class="summary" aria-live="polite">
+diff --git a/styles.css b/styles.css
+index 1ef266d..87b95fb 100644
+--- a/styles.css
++++ b/styles.css
+@@ -178,6 +178,23 @@ body.dark .todo-form input[type="text"] {
+     background: rgba(220, 38, 38, 0.16);
+ }
+ 
++.search-input {
++    box-sizing: border-box;
++    width: 100%;
++    margin-bottom: 1rem;
++    padding: 0.75rem 1.25rem;
++    border: 1px solid var(--border);
++    border-radius: 999px;
++    font-size: 1rem;
++    background: rgba(255, 255, 255, 0.9);
++}
++
++body.dark .search-input {
++    border-color: var(--border-dark);
++    background: rgba(17, 24, 39, 0.8);
++    color: inherit;
++}
++
+ .task-section {
+     background: rgba(255, 255, 255, 0.7);
+     border-radius: 20px;

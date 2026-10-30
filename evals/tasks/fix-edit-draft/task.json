@@ -1,0 +1,13 @@
+{
+  "suite": "regression",
+  "base_ref": "5907db10cae2",
+  "source": "Real bug fixed in c4ac048 (editing text was reset when another task was starred or checked)",
+  "prompt": "バグ報告: タスクの「編集」を押して文字を書き換えている途中に、別のタスクの☆（重要）やチェックボックスを押すと、編集中の入力内容が元のテキストに戻ってしまいます。\n\n保存かキャンセルをするまでは、編集中の内容（タスク名と期限）が保たれるように修正してください。キャンセルしたら次に編集を開いたときは保存済みの内容が表示されるようにしてください。",
+  "regression": true,
+  "allowed_files": [
+    "app.js"
+  ],
+  "judge": {
+    "rubric": "pass の条件: (1) 再描画をまたいで編集中のタスク名と期限が保持される (2) 保存・キャンセル・別タスクの編集開始で下書きが破棄される (3) 既存の保存/キャンセル/Escの動作を壊していない (4) 変更が依頼の範囲に収まっている。"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "suite": "regression",
+  "base_ref": "5907db10cae2",
+  "prompt": "タスクを追加するボタンのラベルを「追加」から「登録」に変えてください。それ以外は変えないでください。",
+  "regression": true,
+  "allowed_files": [
+    "index.html"
+  ],
+  "max_changed_lines": 2
+}

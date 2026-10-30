@@ -1,0 +1,29 @@
+diff --git a/app.js b/app.js
+index d9cd2da..8988d01 100644
+--- a/app.js
++++ b/app.js
+@@ -412,9 +412,10 @@
+         updateBackupStatus();
+     }
+ 
+-    function mergeById(current, incoming) {
+-        const knownIds = new Set(current.map(item => item.id));
++    // knownIds spans live tasks and the archive so one task never ends up in both.
++    function mergeById(current, incoming, knownIds) {
+         const added = incoming.filter(item => !knownIds.has(item.id));
++        added.forEach(item => knownIds.add(item.id));
+         return { merged: [...current, ...added], addedCount: added.length };
+     }
+ 
+@@ -437,8 +438,9 @@
+                 return;
+             }
+ 
+-            const nextTasks = mergeById(tasks, normalizeList(incomingTasks, normalizeTask).items);
+-            const nextArchive = mergeById(archivedTasks, normalizeList(incomingArchive, normalizeArchiveRecord).items);
++            const knownIds = new Set([...tasks, ...archivedTasks].map(item => item.id));
++            const nextTasks = mergeById(tasks, normalizeList(incomingTasks, normalizeTask).items, knownIds);
++            const nextArchive = mergeById(archivedTasks, normalizeList(incomingArchive, normalizeArchiveRecord).items, knownIds);
+             if (nextTasks.addedCount === 0 && nextArchive.addedCount === 0) {
+                 window.alert("新しく追加されるデータはありませんでした（すべて取り込み済みです）。");
+                 return;

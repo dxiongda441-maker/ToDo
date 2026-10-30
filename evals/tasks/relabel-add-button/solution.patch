@@ -1,0 +1,13 @@
+diff --git a/index.html b/index.html
+index e63dcc3..5ebabb9 100644
+--- a/index.html
++++ b/index.html
+@@ -18,7 +18,7 @@
+         <form id="todo-form" class="todo-form" autocomplete="off">
+             <label class="visually-hidden" for="task-input">タスク</label>
+             <input id="task-input" name="task" type="text" placeholder="新しいタスクを入力" required>
+-            <button type="submit">追加</button>
++            <button type="submit">登録</button>
+             <div class="form-options">
+                 <label class="due-field">
+                     <span>期限</span>

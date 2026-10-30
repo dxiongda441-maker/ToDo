@@ -1,0 +1,48 @@
+diff --git a/app.js b/app.js
+index 8988d01..b1e5558 100644
+--- a/app.js
++++ b/app.js
+@@ -106,8 +106,6 @@
+     let archivedTasks = [];
+     let activeFilter = "all";
+     let editingId = null;
+-    // Unsaved editor values, kept so re-rendering other tasks does not discard them.
+-    let editDraft = null;
+     const todayKey = toDateKey(Date.now());
+     let selectedDate = todayKey;
+     let currentMonth = startOfMonth(new Date());
+@@ -582,16 +580,11 @@
+         const cancelButton = node.querySelector(".cancel-button");
+ 
+         item.dataset.id = task.id;
+-        textInput.value = editDraft ? editDraft.text : task.text;
+-        dueField.value = editDraft ? editDraft.dueDate : task.dueDate;
+-
+-        form.addEventListener("input", () => {
+-            editDraft = { text: textInput.value, dueDate: dueField.value };
+-        });
++        textInput.value = task.text;
++        dueField.value = task.dueDate;
+ 
+         const cancel = () => {
+             editingId = null;
+-            editDraft = null;
+             renderTasks();
+         };
+ 
+@@ -736,7 +729,6 @@
+ 
+     function startEdit(id) {
+         editingId = id;
+-        editDraft = null;
+         renderTasks();
+     }
+ 
+@@ -750,7 +742,6 @@
+         task.text = trimmed;
+         task.dueDate = normalizeDueDate(dueDate);
+         editingId = null;
+-        editDraft = null;
+         saveTasks();
+         renderTasks();
+     }
