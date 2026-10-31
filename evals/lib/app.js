@@ -32,12 +32,13 @@ function serveDirectory(root) {
 }
 
 // Opens the app in a fresh browser context. `storage` seeds localStorage
-// before the app reads it; dialogs are accepted and recorded; page errors are
-// collected so graders can fail on them.
+// before the app reads it; `clock: true` installs Playwright's fake clock so
+// graders can fast-forward timers (page.clock.runFor); dialogs are accepted
+// and recorded; page errors are collected so graders can fail on them.
 function createAppDriver(browser, baseUrl) {
     return {
         baseUrl,
-        async open({ storage } = {}) {
+        async open({ storage, clock = false } = {}) {
             const context = await browser.newContext({ locale: "ja-JP" });
             context.setDefaultTimeout(5000);
             const page = await context.newPage();
@@ -48,6 +49,7 @@ function createAppDriver(browser, baseUrl) {
                 dialog.accept().catch(() => {});
             });
             page.on("pageerror", error => errors.push(String(error)));
+            if (clock) await page.clock.install();
             await page.goto(`${baseUrl}/index.html`);
             if (storage) {
                 await page.evaluate(entries => {

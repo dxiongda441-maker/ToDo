@@ -20,6 +20,12 @@ on:
         description: "Also run the LLM rubric judge"
         type: boolean
         default: false
+      claude_version:
+        description: "Claude Code version under test (pinned so runs stay comparable)"
+        default: "2.1.314"
+      baseline:
+        description: "Baseline in evals/baselines/ to compare against"
+        default: "main.json"
 
 permissions:
   contents: read
@@ -44,6 +50,8 @@ jobs:
         working-directory: evals
       - run: npm run selfcheck
         working-directory: evals
+        env:
+          SELFCHECK_TRIALS: "3"
 
   agent:
     if: github.event_name == 'workflow_dispatch'
@@ -63,7 +71,15 @@ jobs:
         working-directory: evals
       - run: npx playwright install --with-deps chromium
         working-directory: evals
-      - run: npm install -g @anthropic-ai/claude-code
+      - run: npm install -g "@anthropic-ai/claude-code@${{ inputs.claude_version }}"
+      # The sandbox keeps the agent's Bash out of the checkout (graders,
+      # reference solutions). Ubuntu 24.04 needs unprivileged user namespaces
+      # allowed for bubblewrap.
+      - name: Install sandbox dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap socat
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Run evals
         working-directory: evals
         env:
@@ -80,7 +96,14 @@ jobs:
           node run.js "${args[@]}"
       - name: Write job summary
         if: always()
-        run: cat evals/results/ci/summary.md >> "$GITHUB_STEP_SUMMARY" || true
+        working-directory: evals
+        env:
+          BASELINE: ${{ inputs.baseline }}
+        run: |
+          cat results/ci/summary.md >> "$GITHUB_STEP_SUMMARY" || true
+          if [ -f "baselines/$BASELINE" ] && [ -f results/ci/summary.json ]; then
+            node compare.js "baselines/$BASELINE" results/ci/summary.json >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:

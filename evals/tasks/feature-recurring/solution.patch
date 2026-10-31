@@ -1,0 +1,188 @@
+diff --git a/app.js b/app.js
+index 8988d01..9447979 100644
+--- a/app.js
++++ b/app.js
+@@ -5,6 +5,10 @@
+     const BACKUP_REMINDER_DAYS = 7;
+     const DAY_MS = 24 * 60 * 60 * 1000;
+     const LOCALE = "ja-JP";
++    const REPEAT_RULES = {
++        daily: { days: 1, label: "毎日" },
++        weekly: { days: 7, label: "毎週" }
++    };
+     const STATUS_LABELS = {
+         "Active": "未完了",
+         "Completed": "完了",
+@@ -17,6 +21,7 @@
+     const input = document.querySelector("#task-input");
+     const dueInput = document.querySelector("#due-input");
+     const importantInput = document.querySelector("#important-input");
++    const repeatInput = document.querySelector("#repeat-input");
+     const editTemplate = document.querySelector("#task-edit-template");
+     const overdueCountEl = document.querySelector("#overdue-count");
+     const list = document.querySelector("#task-list");
+@@ -225,6 +230,10 @@
+         return typeof value === "string" && createDateFromKey(value) ? value : "";
+     }
+ 
++    function normalizeRepeat(value) {
++        return Object.prototype.hasOwnProperty.call(REPEAT_RULES, value) ? value : "";
++    }
++
+     function normalizeTask(item, now) {
+         if (!item || typeof item.text !== "string") {
+             return { task: null, migrated: true };
+@@ -259,7 +268,8 @@
+                 createdAt,
+                 completedAt,
+                 dueDate: normalizeDueDate(item.dueDate),
+-                important: Boolean(item.important)
++                important: Boolean(item.important),
++                repeat: normalizeRepeat(item.repeat)
+             },
+             migrated
+         };
+@@ -466,7 +476,7 @@
+         reader.readAsText(file);
+     }
+ 
+-    function createTask(text, dueDate, important) {
++    function createTask(text, dueDate, important, repeat) {
+         const trimmed = text.trim();
+         if (!trimmed) {
+             return null;
+@@ -479,10 +489,31 @@
+             createdAt: Date.now(),
+             completedAt: null,
+             dueDate: normalizeDueDate(dueDate),
+-            important: Boolean(important)
++            important: Boolean(important),
++            repeat: normalizeRepeat(repeat)
+         };
+     }
+ 
++    // The next occurrence is due one period after this one's due date, or
++    // after today when it had none.
++    function nextOccurrence(task) {
++        const rule = REPEAT_RULES[task.repeat];
++        const base = createDateFromKey(task.dueDate) || createDateFromKey(toDateKey(Date.now()));
++        base.setDate(base.getDate() + rule.days);
++        return createTask(task.text, toDateKey(base), task.important, task.repeat);
++    }
++
++    // Completing a repeating task adds its next occurrence once: re-checking
++    // the same task finds the open occurrence and does not add another.
++    function addNextOccurrence(task) {
++        const next = nextOccurrence(task);
++        const exists = tasks.some(item =>
++            !item.completed && item.text === next.text && item.repeat === next.repeat && item.dueDate === next.dueDate);
++        if (!exists) {
++            tasks.unshift(next);
++        }
++    }
++
+     function archiveTask(task, reason) {
+         if (!task || typeof task.text !== "string") {
+             return;
+@@ -630,6 +661,7 @@
+             const text = node.querySelector(".task-text");
+             const meta = node.querySelector(".task-meta");
+             const due = node.querySelector(".task-due");
++            const repeat = node.querySelector(".task-repeat");
+             const importantButton = node.querySelector(".important-button");
+             const editButton = node.querySelector(".edit-button");
+             const deleteButton = node.querySelector(".delete-button");
+@@ -648,6 +680,10 @@
+                 due.classList.add(`task-due--${dueInfo.state}`);
+             }
+ 
++            const repeatRule = REPEAT_RULES[task.repeat];
++            repeat.hidden = !repeatRule;
++            repeat.textContent = repeatRule ? `🔁 ${repeatRule.label}` : "";
++
+             importantButton.textContent = task.important ? "★" : "☆";
+             importantButton.setAttribute("aria-pressed", task.important ? "true" : "false");
+             importantButton.setAttribute("aria-label", task.important ? "重要マークを外す" : "重要にする");
+@@ -719,6 +755,9 @@
+ 
+         task.completed = Boolean(completed);
+         task.completedAt = task.completed ? Date.now() : null;
++        if (task.completed && task.repeat) {
++            addNextOccurrence(task);
++        }
+         saveTasks();
+         renderTasks();
+     }
+@@ -782,7 +821,7 @@
+     function handleFormSubmit(event) {
+         event.preventDefault();
+         const value = input.value;
+-        const task = createTask(value, dueInput.value, importantInput.checked);
++        const task = createTask(value, dueInput.value, importantInput.checked, repeatInput.value);
+         if (!task) {
+             input.focus();
+             return;
+@@ -792,6 +831,7 @@
+         input.value = "";
+         dueInput.value = "";
+         importantInput.checked = false;
++        repeatInput.value = "";
+         input.focus();
+         saveTasks();
+         renderTasks();
+diff --git a/index.html b/index.html
+index e63dcc3..0a6047b 100644
+--- a/index.html
++++ b/index.html
+@@ -28,6 +28,14 @@
+                     <input id="important-input" name="important" type="checkbox">
+                     <span>★ 重要</span>
+                 </label>
++                <label class="due-field">
++                    <span>繰り返し</span>
++                    <select id="repeat-input" name="repeat">
++                        <option value="">なし</option>
++                        <option value="daily">毎日</option>
++                        <option value="weekly">毎週</option>
++                    </select>
++                </label>
+             </div>
+         </form>
+ 
+@@ -88,6 +96,7 @@
+                     <span class="task-text"></span>
+                     <span class="task-info">
+                         <span class="task-due" hidden></span>
++                        <span class="task-repeat" hidden></span>
+                         <time class="task-meta" datetime=""></time>
+                     </span>
+                 </span>
+diff --git a/styles.css b/styles.css
+index 1ef266d..b171062 100644
+--- a/styles.css
++++ b/styles.css
+@@ -260,6 +260,24 @@ body.dark .task-item {
+     white-space: nowrap;
+ }
+ 
++.task-repeat {
++    font-size: 0.72rem;
++    font-weight: 600;
++    padding: 0.05rem 0.5rem;
++    border-radius: 999px;
++    background: rgba(99, 102, 241, 0.12);
++    color: #4338ca;
++    white-space: nowrap;
++}
++
++.due-field select {
++    padding: 0.4rem 0.75rem;
++    border: 1px solid var(--border);
++    border-radius: 999px;
++    font: inherit;
++    background: rgba(255, 255, 255, 0.9);
++}
++
+ .task-due--soon {
+     background: rgba(37, 99, 235, 0.12);
+     color: #1d4ed8;

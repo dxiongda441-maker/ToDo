@@ -3,13 +3,16 @@ const assert = require("node:assert/strict");
 const task = (id, text, extra = {}) => ({ id, text, completed: false, createdAt: 1700000000000, completedAt: null, dueDate: "", important: false, ...extra });
 const archived = (id, text) => ({ ...task(id, text), deletedAt: 1700000500000, reason: "deleted" });
 
+// Every import ends in a confirm or an alert; waiting for it (instead of a
+// fixed delay) means the import has been handled when storage is read.
 async function importBackup(session, payload) {
+    const dialog = session.page.waitForEvent("dialog");
     await session.page.setInputFiles("#import-input", {
         name: "backup.json",
         mimeType: "application/json",
         buffer: Buffer.from(JSON.stringify(payload))
     });
-    await session.page.waitForTimeout(300);
+    await dialog;
 }
 
 async function ids(session) {

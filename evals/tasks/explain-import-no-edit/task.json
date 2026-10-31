@@ -1,5 +1,5 @@
 {
-  "suite": "regression",
+  "suite": "capability",
   "base_ref": "5907db10cae2",
   "prompt": "コードは変更せずに質問に答えてください。\n\nバックアップから復元するとき、すでにあるデータと重複しないようにどう判定していますか？ 関係する関数名を挙げて、3〜5文で簡潔に説明してください。",
   "expect_no_changes": true,
@@ -9,7 +9,10 @@
     "NotebookEdit"
   ],
   "judge": {
-    "rubric": "pass の条件: (1) id をキーに既存のタスク一覧と履歴の両方と照合していることを正しく説明している (2) mergeById と importData に触れている (3) 事実と異なる説明がない (4) 3〜5文程度で簡潔。",
-    "required": false
+    "rubric": "pass の条件: (1) id をキーに既存のタスク一覧と履歴の両方と照合していることを正しく説明している (2) mergeById と importData に触れている (3) 事実と異なる説明がない（渡されたソースコードと照らし合わせること。言い過ぎや、実際には防げない重複を防げると書くことも誤りとする） (4) 3〜5文程度で簡潔。",
+    "required": true,
+    "context_files": [
+      "app.js"
+    ]
   }
 }

@@ -1,0 +1,146 @@
+diff --git a/app.js b/app.js
+index 8988d01..095714d 100644
+--- a/app.js
++++ b/app.js
+@@ -4,6 +4,7 @@
+     const BACKUP_STORAGE_KEY = "todo.lastBackupAt.v1";
+     const BACKUP_REMINDER_DAYS = 7;
+     const DAY_MS = 24 * 60 * 60 * 1000;
++    const UNDO_MS = 5000;
+     const LOCALE = "ja-JP";
+     const STATUS_LABELS = {
+         "Active": "未完了",
+@@ -37,6 +38,9 @@
+     const importButton = document.querySelector("#import-button");
+     const importInput = document.querySelector("#import-input");
+     const backupStatusEl = document.querySelector("#backup-status");
++    const undoToast = document.querySelector("#undo-toast");
++    const undoMessage = document.querySelector("#undo-message");
++    const undoButton = document.querySelector("#undo-button");
+     const historyEnabled = Boolean(
+         calendarGrid &&
+         monthLabelEl &&
+@@ -108,6 +112,9 @@
+     let editingId = null;
+     // Unsaved editor values, kept so re-rendering other tasks does not discard them.
+     let editDraft = null;
++    // The most recently deleted task and where it was, while it can still be undone.
++    let lastDeleted = null;
++    let undoTimer = null;
+     const todayKey = toDateKey(Date.now());
+     let selectedDate = todayKey;
+     let currentMonth = startOfMonth(new Date());
+@@ -761,10 +768,39 @@
+             return;
+         }
+ 
++        const index = tasks.indexOf(task);
+         archiveTask(task, "deleted");
+         tasks = tasks.filter(item => item.id !== id);
+         saveTasks();
+         renderTasks();
++        showUndo(task, index);
++    }
++
++    function showUndo(task, index) {
++        lastDeleted = { task, index };
++        undoMessage.textContent = `「${task.text}」を削除しました`;
++        undoToast.hidden = false;
++        clearTimeout(undoTimer);
++        undoTimer = setTimeout(hideUndo, UNDO_MS);
++    }
++
++    function hideUndo() {
++        clearTimeout(undoTimer);
++        lastDeleted = null;
++        undoToast.hidden = true;
++    }
++
++    function undoDelete() {
++        if (!lastDeleted) {
++            return;
++        }
++
++        const { task, index } = lastDeleted;
++        tasks.splice(Math.min(index, tasks.length), 0, task);
++        hideUndo();
++        saveTasks();
++        saveArchive();
++        renderTasks();
+     }
+ 
+     function clearCompletedTasks() {
+@@ -1163,6 +1199,7 @@
+     });
+ 
+     clearCompletedButton.addEventListener("click", clearCompletedTasks);
++    undoButton.addEventListener("click", undoDelete);
+ 
+     exportButton.addEventListener("click", exportData);
+     importButton.addEventListener("click", () => {
+diff --git a/index.html b/index.html
+index e63dcc3..52a8bad 100644
+--- a/index.html
++++ b/index.html
+@@ -80,6 +80,11 @@
+         </section>
+     </main>
+ 
++    <div id="undo-toast" class="undo-toast" role="status" hidden>
++        <span id="undo-message"></span>
++        <button type="button" id="undo-button">元に戻す</button>
++    </div>
++
+     <template id="task-template">
+         <li class="task-item">
+             <label class="task-main">
+diff --git a/styles.css b/styles.css
+index 1ef266d..76c7b3d 100644
+--- a/styles.css
++++ b/styles.css
+@@ -421,6 +421,45 @@ body.dark .summary {
+     padding: 0.5rem 0;
+ }
+ 
++.undo-toast {
++    position: fixed;
++    left: 50%;
++    bottom: 1.5rem;
++    transform: translateX(-50%);
++    display: flex;
++    align-items: center;
++    gap: 1rem;
++    max-width: calc(100% - 2rem);
++    box-sizing: border-box;
++    padding: 0.75rem 1rem 0.75rem 1.25rem;
++    border-radius: 999px;
++    background: #1e293b;
++    color: #f8fafc;
++    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
++    font-size: 0.9rem;
++}
++
++.undo-toast[hidden] {
++    display: none;
++}
++
++#undo-message {
++    overflow: hidden;
++    text-overflow: ellipsis;
++    white-space: nowrap;
++}
++
++#undo-button {
++    flex-shrink: 0;
++    border: none;
++    border-radius: 999px;
++    padding: 0.4rem 0.9rem;
++    background: var(--accent);
++    color: #fff;
++    font-weight: 600;
++    cursor: pointer;
++}
++
+ .visually-hidden {
+     position: absolute;
+     width: 1px;
