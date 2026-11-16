@@ -5,11 +5,13 @@ ToDo アプリの「履歴（カレンダー）」をライフログとして扱
 
 ---
 
-## 0. 前提
+## 0. 前提（2026-11-16 更新）
 
-- **「ライフログ」はこのリポジトリの ToDo アプリを指す**と想定しています。今のアプリには「その日に作成・完了・削除したタスク」をカレンダーで振り返る履歴機能があり、これを「日々の記録＝ライフログ」の土台にします。
-  - 別のライフログアプリを指している場合は教えてください。リポジトリ内のどのブランチにも「lifelog / ライフログ」という名前のコードは見つかりませんでした。
-- 今のアプリの作りに合わせます：素の HTML / CSS / JavaScript で、サーバーは使わず、データはブラウザの `localStorage` に保存し、JSON でバックアップします。GitHub Pages で公開します。
+- **ライフログは claude.ai 上の非公開ページ「ライフログ」**（`https://claude.ai/artifact/RX7GowmmoLBsmHbAsSDdTL`、旧名つみあげ帳）でした。この ToDo アプリではありません。
+- そこに **「読書」タブ**を追加しました（バージョン13）。記録の入れ方は次のとおりです。
+  - **入力はチャット**：本人がチャットで振り返りを送り、Claude がページのデータベースに書き込む。ページ側は表示専用。
+  - **閲覧**：スマホ・PCで claude.ai にログインしてページを開く。データは持ち主だけが読み書きできる。
+- 下の 4〜7 章（ISBN 自動入力、localStorage、ToDo アプリ内のタブなど）は当初の案です。実際の保存先と項目名は「9. 実装したデータの形」を見てください。
 
 ---
 
@@ -297,3 +299,45 @@ ToDo アプリの「履歴（カレンダー）」をライフログとして扱
 - [Readlog（Obsidian プラグイン）](https://community.obsidian.md/plugins/readlog)
 - [openBD API 仕様](https://openbd.jp/pdf/api20170123.pdf)
 - [Open Library Books API](https://openlibrary.org/dev/docs/api/books)
+
+---
+
+## 9. 実装したデータの形（ライフログのデータベース）
+
+### books（本1冊 = 1件）
+
+| 項目 | 内容 |
+|---|---|
+| `title` `subtitle` | 題名・副題 |
+| `authors` `translators` | 著者・訳者（配列） |
+| `publisher` `publishedYear` `isbn` `pageCount` `currentPage` | 出版社・発行年・ISBN・ページ数・いま読んでいるページ |
+| `format` | `paper` / `ebook` / `audio` |
+| `tags` | 配列 |
+| `status` | `want` 読みたい / `reading` 読んでいる / `finished` 読了 / `paused` 中断 / `dropped` やめた |
+| `addedAt` `startedAt` `finishedAt` | `YYYY-MM-DD` |
+| `before` | `trigger` きっかけ、`questions` [{id, text}] 学びたい問い、`prediction` 予想、`focusChapters` 気になる章、`writtenAt` |
+| `after` | `oneLine` 一言、`answers` [{questionId, text}] 問いへの答え、`predictionResult` 予想と実際、`takeaways` 学びベスト3、`actions` [{text}] やってみること、`rating` 1〜5、`review` 感想、`recommendTo` 薦めたい人、`writtenAt` |
+| `followUps` | [{date, note}] 後日の振り返り |
+| `updatedAt` | ISO 日時 |
+
+### bookNotes（章ごとのメモ = 1件）
+
+| 項目 | 内容 |
+|---|---|
+| `bookId` | books のドキュメント ID |
+| `order` `title` `range` `date` | 並び順・章名・範囲（例 p.1-40）・書いた日 |
+| `keywords` | 配列 |
+| `learnings` | [{text, starred}] 学んだこと（★は大事なもの） |
+| `summary` `thoughts` | 要約・自分の考えや疑問 |
+| `quotes` | [{text, page}] 引用 |
+| `questionIds` | 関係する読む前の問い |
+| `createdAt` | ISO 日時 |
+
+1件あたり 256KB までなので、章メモは本とは別の集まりにしています。
+
+### チャットからの記録の流れ
+
+1. 「『○○』を読み始めた」→ 書誌情報を確認して `books` を作る（`status: reading`）。読む前の問い・きっかけ・予想も聞いて `before` に入れる。
+2. 「第N章の振り返り」→ `bookNotes` を1件作る。キーワード・学んだこと・要約・引用（ページ番号）・考えに振り分ける。
+3. 「読み終えた」→ `status: finished` と `finishedAt` を入れ、`before.questions` を見せながら答えを聞いて `after` に入れる。
+4. 書誌情報は、本人が言わなかったものを推測で埋めない。分からない項目は空のままにして確認する。
